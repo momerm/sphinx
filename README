@@ -1,11 +1,9 @@
-Sphinx v0.8 README
-2011-03-06
-Ian Goldberg <iang@cs.uwaterloo.ca>
-
-Except for the public-domain curve25519 portions by Dan Bernstein, this
-software is licenced as follows:
+Sphinx v0.8-UCL README
+2016-11-12
+George Danezis <g.danezis@ucl.ac.uk>
 
 # Copyright 2011 Ian Goldberg
+# Copyright 2016 George Danezis (UCL InfoSec Group)
 #
 # This file is part of Sphinx.
 # 
@@ -22,19 +20,4 @@ software is licenced as follows:
 # License along with Sphinx.  If not, see
 # <http://www.gnu.org/licenses/>.
 
-The LIONESS implementation and the xcounter CTR mode class are adapted
-from "Experimental implementation of the sphinx cryptographic mix packet
-format by George Danezis".
-
-Enabling ECC (curve25519) support:
-
-- You'll need swig, as well as a populated /usr/include/python-2.6
-  directory.
-- cd curve25519 && make && cd ..
-
-Testing:
-
-- ./SphinxClient.py  or  ./SphinxClient.py -ecc
-
-The latter is smaller and faster, but requires curve25519 support to be
-enabled.
+This is a UCL branch and port of the original Sphinx software to using modern python libraries, including petlib for cryptography and msgpack for binary formats. It also decouples the message processing from other concerns to allow sphix to be embedded into other applications. It is based on the original software by Ian Goldberg (U. Waterloo) and retains both his copyright and the original LGPL licence.
