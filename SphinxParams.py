@@ -42,33 +42,38 @@ class Group_ECC:
 
     def __init__(self, gid=713):
         self.G = EcGroup(gid)
-        self.g = self.G.generator().export()
+        self.g = self.G.generator() # .export()
 
     def gensecret(self):
-        return self.G.order().random().binary()
+        return self.G.order().random() # .binary()
 
     def expon(self, base, exp):
-        x = Bn.from_binary(exp)
-        b = EcPt.from_binary(base, self.G)
-        return (x * b).export()
+        # x = Bn.from_binary(exp)
+        # b = EcPt.from_binary(base, self.G)
+        
+        x = exp
+        b = base
+        return (x * b) # .export()
 
     def multiexpon(self, base, exps):
-        base = EcPt.from_binary(base, self.G)
+        # base = EcPt.from_binary(base, self.G)
         expon = 1
         for e in exps:
-            expon = Bn.from_binary(e).mod_mul( expon, self.G.order())
-        return (expon * base).export()
+            # expon = Bn.from_binary(e).mod_mul( expon, self.G.order())
+            expon = e.mod_mul( expon, self.G.order())
+        return (expon * base) # .export()
 
     def makeexp(self, data):
-        return (Bn.from_binary(data) % self.G.order()).binary()
+        return (Bn.from_binary(data) % self.G.order()) # .binary()
+        #return data % self.G.order()
 
     def in_group(self, alpha):
         # All strings of length 32 are in the group, says DJB
-        b = EcPt.from_binary(alpha, self.G)
+        b = alpha # EcPt.from_binary(alpha, self.G)
         return self.G.check_point(b)
 
     def printable(self, alpha):
-        return alpha.encode("hex")
+        return alpha.export() # .encode("hex")
 
 def test_group():
     G = Group_ECC()

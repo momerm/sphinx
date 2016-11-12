@@ -47,23 +47,15 @@ def create_header(params, nodelist, dest, id):
     x = group.gensecret()
 
     # Compute the (alpha, s, b) tuples
-    blinds = [x]
+    blind_factor = x
     asbtuples = []
-    s_alpha = group.expon(group.g, x)
-    # s_sec   = pki[node].y
-
+    
     for node in nodelist:
-        # alpha = group.multiexpon(group.g, blinds)
-        s = group.multiexpon(pki[node].y, blinds)
-        alpha = s_alpha
-        # assert s_sec == s
-
-        b = p.hb(alpha,s)
-        blinds.append(b)
-
-        s_alpha = group.expon(s_alpha, b)
-        # s_sec   = group.expon(s_sec, b)
-
+        alpha = group.expon(group.g, blind_factor)
+        s = group.expon(pki[node].y, blind_factor)
+        b = p.hb(alpha, s)
+        blind_factor = blind_factor.mod_mul(b, p.group.G.order())
+        
         asbtuples.append({ 'alpha': alpha, 's': s, 'b': b})
 
     # Compute the filler strings
@@ -212,15 +204,15 @@ def test_timing():
     t1 = time.time()
     print("Time per mix encoding: %.2fms" % ((t1-t0)*1000.0/100))
 
-    #from SphinxNode import sphinx_process
-    #import time
-    #t0 = time.time()
-    #for _ in range(100):
-    #    x = params.pki[use_nodes[0]]._x
-    #    sphinx_process(params, x, {}, header, delta)
-    #    # header, delta = create_forward_message(params, use_nodes, "dest", "this is a test")
-    #t1 = time.time()
-    #print("Time per mix processing: %.2fms" % ((t1-t0)*1000.0/100))
+    from SphinxNode import sphinx_process
+    import time
+    t0 = time.time()
+    for _ in range(100):
+        x = params.pki[use_nodes[0]]._x
+        sphinx_process(params, x, {}, header, delta)
+        # header, delta = create_forward_message(params, use_nodes, "dest", "this is a test")
+    t1 = time.time()
+    print("Time per mix processing: %.2fms" % ((t1-t0)*1000.0/100))
 
 
 if __name__ == "__main__":
