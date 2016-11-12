@@ -18,8 +18,8 @@
 # License along with Sphinx.  If not, see
 # <http://www.gnu.org/licenses/>.
 
-import sys
-import os
+
+from os import urandom
 from SphinxParams import SphinxParams
 from SphinxNode import SphinxTestNode, Denc, Dspec, pad_body, unpad_body
 from SphinxNymserver import Nymserver
@@ -29,7 +29,7 @@ def rand_subset(lst, nu):
     replacement)."""
 
     # Randomize the order of the list by sorting on a random key
-    nodeids = [(os.urandom(8),x) for x in lst]
+    nodeids = [(urandom(8),x) for x in lst]
     nodeids.sort(key=lambda x:x[0])
 
     # Return the first nu elements of the randomized list
@@ -49,11 +49,21 @@ def create_header(params, nodelist, dest, id):
     # Compute the (alpha, s, b) tuples
     blinds = [x]
     asbtuples = []
+    s_alpha = group.expon(group.g, x)
+    # s_sec   = pki[node].y
+
     for node in nodelist:
-        alpha = group.multiexpon(group.g, blinds)
+        # alpha = group.multiexpon(group.g, blinds)
         s = group.multiexpon(pki[node].y, blinds)
+        alpha = s_alpha
+        # assert s_sec == s
+
         b = p.hb(alpha,s)
         blinds.append(b)
+
+        s_alpha = group.expon(s_alpha, b)
+        # s_sec   = group.expon(s_sec, b)
+
         asbtuples.append({ 'alpha': alpha, 's': s, 'b': b})
 
     # Compute the filler strings
@@ -62,28 +72,21 @@ def create_header(params, nodelist, dest, id):
         min = (2*(p.r-i)+3)*p.k
         phi = p.xor(phi + ("\x00" * (2*p.k)),
             p.rho(p.hrho(asbtuples[i-1]['s']))[min:])
-        # print i,phi.encode("hex")
-
+    
     # Compute the (beta, gamma) tuples
     # The os.urandom used to be a string of 0x00 bytes, but that's wrong
-    beta = dest + id + os.urandom(((2 * (p.r - nu) + 2)*p.k - len(dest)))
+    beta = dest + id + urandom(((2 * (p.r - nu) + 2)*p.k - len(dest)))
     beta = p.xor(beta,
         p.rho(p.hrho(asbtuples[nu-1]['s']))[:(2*(p.r-nu)+3)*p.k]) + phi
     gamma = p.mu(p.hmu(asbtuples[nu-1]['s']), beta)
-    # print "s =", group.printable(asbtuples[i]['s'])
-    # print "beta = ", beta.encode("hex")
-    # print "gamma = ", gamma.encode("hex")
+    
     for i in xrange(nu-2, -1, -1):
         id = nodelist[i+1]
         assert len(id) == p.k
         beta = p.xor(id + gamma + beta[:(2*p.r-1)*p.k],
             p.rho(p.hrho(asbtuples[i]['s']))[:(2*p.r+1)*p.k])
         gamma = p.mu(p.hmu(asbtuples[i]['s']), beta)
-        # print pki[id].name
-        # print "s =", group.printable(asbtuples[i]['s'])
-        # print "beta = ", beta.encode("hex")
-        # print "gamma = ", gamma.encode("hex")
-
+    
     return (asbtuples[0]['alpha'], beta, gamma), \
         [x['s'] for x in asbtuples]
 
@@ -112,12 +115,12 @@ def create_surb(params, nodelist, dest):
     p = params
     pki = p.pki
     nu = len(nodelist)
-    id = os.urandom(p.k)
+    id = urandom(p.k)
 
     # Compute the header and the secrets
     header, secrets = create_header(params, nodelist, Denc(dest), id)
 
-    ktilde = os.urandom(p.k)
+    ktilde = urandom(p.k)
     keytuple = [ktilde]
     keytuple.extend(map(p.hpi, secrets))
     return id, keytuple, (nodelist[0], header, ktilde)
@@ -125,7 +128,7 @@ def create_surb(params, nodelist, dest):
 
 class SphinxClient:
     def __init__(self, params):
-        self.id = "Client " + os.urandom(4).encode("hex")
+        self.id = "Client " + urandom(4).encode("hex")
         self.params = params
         params.clients[self.id] = self
         self.keytable = {}
@@ -200,12 +203,25 @@ def test_timing():
     # Pick a list of nodes to use
     use_nodes = rand_subset(params.pki.keys(), r)
 
+    print()
+    
     import time
     t0 = time.time()
     for _ in range(100):
         header, delta = create_forward_message(params, use_nodes, "dest", "this is a test")
     t1 = time.time()
     print("Time per mix encoding: %.2fms" % ((t1-t0)*1000.0/100))
+
+    #from SphinxNode import sphinx_process
+    #import time
+    #t0 = time.time()
+    #for _ in range(100):
+    #    x = params.pki[use_nodes[0]]._x
+    #    sphinx_process(params, x, {}, header, delta)
+    #    # header, delta = create_forward_message(params, use_nodes, "dest", "this is a test")
+    #t1 = time.time()
+    #print("Time per mix processing: %.2fms" % ((t1-t0)*1000.0/100))
+
 
 if __name__ == "__main__":
     test_timing()

@@ -25,20 +25,10 @@
 import os
 from SphinxNymserver import Nymserver
 
-try:
-    from Crypto.Cipher import AES
-    from Crypto.Hash import SHA256, HMAC
-    from Crypto.Util import number
-except:
-    print "\n\n*** You need to install the Python Cryptography Toolkit. ***\n\n"
-    raise
-
-try:
-    from curvedh import *
-except:
-    pass
-
 from hashlib import sha256
+import hmac
+
+from os import urandom
 
 from petlib.ec import EcGroup, EcPt
 from petlib.bn import Bn
@@ -63,9 +53,11 @@ class Group_ECC:
         return (x * b).export()
 
     def multiexpon(self, base, exps):
-        baseandexps = [base]
-        baseandexps.extend(exps)
-        return reduce(self.expon, baseandexps)
+        base = EcPt.from_binary(base, self.G)
+        expon = 1
+        for e in exps:
+            expon = Bn.from_binary(e).mod_mul( expon, self.G.order())
+        return (expon * base).export()
 
     def makeexp(self, data):
         return (Bn.from_binary(data) % self.G.order()).binary()
@@ -105,17 +97,23 @@ def test_params():
     m2 = params.lioness_dec(k, c)
     assert m == m2
 
+    k = urandom(16)
+    c = params.aes_ctr(k, "Hello World!")
+    assert params.aes_ctr(k, c) == "Hello World!"
+
 class SphinxParams:
     k = 16 # in bytes, == 128 bits
     m = 1024 # size of message body, in bytes
     pki = {} # mapping of node id to node
     clients = {} # mapping of destinations to clients
 
+
     def __init__(self, r=5, group=None):
         self.r = r
-        if group:
-            self.group = group
-        else:
+        self.aes = Cipher("AES-128-CTR")
+
+        self.group = group
+        if not group:
             self.group = Group_ECC()
 
         self.nymserver = Nymserver(self)
@@ -126,19 +124,12 @@ class SphinxParams:
         dt = numpy.dtype('B');
         return numpy.bitwise_xor(numpy.fromstring(key, dtype=dt), numpy.fromstring(data, dtype=dt)).tostring()
 
-    class xcounter:
-        # Implements a string counter to do AES-CTR mode
-        i = 0
-        def __init__(self, size):
-            self.size = size
-    
-        def __call__(self):
-            ii = number.long_to_bytes(self.i)
-            ii = '\x00' * (self.size-len(ii)) + ii
-            self.i += 1
-            return ii
-
     # The LIONESS PRP
+
+    def aes_ctr(self, k, m):
+        iv = "\x00" * 16
+        c = self.aes.enc(k, iv).update(m)
+        return c
 
     def lioness_enc(self, key, message):
         assert len(key) == self.k
@@ -149,16 +140,16 @@ class SphinxParams:
 
         # Round 2
         k2 = self.xor(r1[:self.k], key)
-        c = AES.new(k2, AES.MODE_CTR, counter=self.xcounter(self.k))
-        r2 = r1[:self.k] + c.encrypt(r1[self.k:])
+        c = self.aes_ctr(k2, r1[self.k:])
+        r2 = r1[:self.k] + c
 
         # Round 3
         r3 = self.xor(self.hash(r2[self.k:]+key+'3')[:self.k], r2[:self.k]) + r2[self.k:]
 
         # Round 4
         k4 = self.xor(r3[:self.k], key)
-        c = AES.new(k4, AES.MODE_CTR, counter=self.xcounter(self.k))
-        r4 = r3[:self.k] + c.encrypt(r3[self.k:])
+        c = self.aes_ctr(k4, r3[self.k:])
+        r4 = r3[:self.k] + c
 
         return r4
 
@@ -170,16 +161,16 @@ class SphinxParams:
 
         # Round 4
         k4 = self.xor(r4[:self.k], key)
-        c = AES.new(k4, AES.MODE_CTR, counter=self.xcounter(self.k))
-        r3 = r4[:self.k] + c.encrypt(r4[self.k:])
+        c = self.aes_ctr(k4, r4[self.k:])
+        r3 = r4[:self.k] + c # c.encrypt(r4[self.k:])
 
         # Round 3
         r2 = self.xor(self.hash(r3[self.k:]+key+'3')[:self.k], r3[:self.k]) + r3[self.k:]
 
         # Round 2
         k2 = self.xor(r2[:self.k], key)
-        c = AES.new(k2, AES.MODE_CTR, counter=self.xcounter(self.k))
-        r1 = r2[:self.k] + c.encrypt(r2[self.k:])
+        c = self.aes_ctr(k2, r2[self.k:])
+        r1 = r2[:self.k] + c # c.encrypt(r2[self.k:])
 
         # Round 1
         r0 = self.xor(self.hash(r1[self.k:]+key+'1')[:self.k], r1[:self.k]) + r1[self.k:]
@@ -189,13 +180,13 @@ class SphinxParams:
     # The PRG; key is of length k, output is of length (2r+3)k
     def rho(self, key):
         assert len(key) == self.k
-        c = AES.new(key, AES.MODE_CTR, counter=self.xcounter(self.k))
-        return c.encrypt("\x00" * ( (2 * self.r + 3) * self.k ))
+        p = "\x00" * ( (2 * self.r + 3) * self.k )
+        return self.aes_ctr(key, p)
 
     # The HMAC; key is of length k, output is of length k
     def mu(self, key, data):
-        m = HMAC.new(key, msg=data, digestmod=SHA256)
-        return m.digest()[:self.k]
+        mac = hmac.new(key, data, digestmod=sha256).digest()[:self.k]
+        return mac
 
     # The PRP; key is of length k, data is of length m
     def pi(self, key, data):

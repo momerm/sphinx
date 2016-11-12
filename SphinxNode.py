@@ -18,11 +18,13 @@
 # License along with Sphinx.  If not, see
 # <http://www.gnu.org/licenses/>.
 
-import os
+from os import urandom
 import re
 
 # Padding/unpadding of message bodies: a 0 bit, followed by as many 1
 # bits as it takes to fill it up
+
+re_compiled = re.compile("\x7f\xff*$")
 
 def pad_body(msgtotalsize, body):
     body = body + "\x7f"
@@ -30,7 +32,7 @@ def pad_body(msgtotalsize, body):
     return body
 
 def unpad_body(body):
-    return re.compile("\x7f\xff*$").sub('', body)
+    return re_compiled.sub('', body)
 
 # Prefix-free encoding/decoding of node names and destinations
 
@@ -123,13 +125,13 @@ class SphinxTestNode:
 
         # Load the user provided secret for the Node
         if secret == None:
-            self.__x = group.gensecret()
+            self._x = group.gensecret()
         else:
-            self.__x = secret
+            self._x = secret
 
         # Generate public key
-        self.y = group.expon(group.g, self.__x)
-        idnum = os.urandom(4)
+        self.y = group.expon(group.g, self._x)
+        idnum = urandom(4)
         
 
         self.id = Nenc(self.p, idnum)
@@ -143,7 +145,7 @@ class SphinxTestNode:
 
     def process(self, header, delta):
 
-        RET = sphinx_process(self.p, self.__x, {}, header, delta)
+        RET = sphinx_process(self.p, self._x, {}, header, delta)
 
         print "Processing at", self.name
 
