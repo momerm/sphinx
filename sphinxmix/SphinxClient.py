@@ -92,7 +92,7 @@ def create_header(params, nodelist, dest, id):
 
 def create_forward_message(params, nodelist, dest, msg):
     p = params
-    pki = p.pki
+    # pki = p.pki
     nu = len(nodelist)
     assert len(dest) < 128 and len(dest) > 0
     assert p.k + 1 + len(dest) + len(msg) < p.m
@@ -112,7 +112,7 @@ def create_forward_message(params, nodelist, dest, msg):
 
 def create_surb(params, nodelist, dest):
     p = params
-    pki = p.pki
+    # pki = p.pki
     nu = len(nodelist)
     id = urandom(p.k)
 
