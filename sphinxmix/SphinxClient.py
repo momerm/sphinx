@@ -245,29 +245,32 @@ def test_minimal():
     # The minimal PKI involves names of nodes and keys
     from SphinxNode import Nenc
     
-    pki = {}
+    pkiPriv = {}
+    pkiPub = {}
+
     for i in range(2*r):
         nid = Nenc(params, bytes([i]))
         x = params.group.gensecret()
         y = params.group.expon(params.group.g, x)
-        pki[nid] = pki_entry(nid, x, y)
+        pkiPriv[nid] = pki_entry(nid, x, y)
+        pkiPub[nid] = pki_entry(nid, None, y)
 
     # The simplest path selection algorithm and message packaging
-    use_nodes = rand_subset(pki.keys(), r)
+    use_nodes = rand_subset(pkiPub.keys(), r)
     dest = b"bob"
     message = b"this is a test"
-    header, delta = create_forward_message(params, use_nodes, pki, dest, message)
+    header, delta = create_forward_message(params, use_nodes, pkiPub, dest, message)
 
     # Process message by the sequence of mixes
     from .SphinxNode import sphinx_process
-    x = pki[use_nodes[0]].x
+    x = pkiPriv[use_nodes[0]].x
 
     while True:
         seen = {}
         ret = sphinx_process(params, x, seen, header, delta)
         if ret[0] == "Node":
             _, (addr, header, delta) = ret
-            x = pki[addr].x 
+            x = pkiPriv[addr].x 
         elif ret[0] == "Process":
             print(ret[1])
             break
