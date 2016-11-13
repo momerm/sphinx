@@ -21,6 +21,9 @@
 from os import urandom
 import re
 
+# Python 2/3 compatibility
+from builtins import bytes
+
 # Padding/unpadding of message bodies: a 0 bit, followed by as many 1
 # bits as it takes to fill it up
 
@@ -32,16 +35,19 @@ def pad_body(msgtotalsize, body):
     return body
 
 def unpad_body(body):
+    body = bytes(body)
     l = len(body) - 1
-    x_marker = b"\x7f"[0]
-    f_marker = b"\xff"[0]
+    x_marker = bytes(b"\x7f")[0]
+    f_marker = bytes(b"\xff")[0]
     while body[l] == f_marker and l > 0:
         l -= 1
-        break
+    
     if body[l] == x_marker:
-        return body[:l]
+        ret = body[:l]
     else:
-        return b''
+        ret = b''
+    
+    return ret
 
 # Prefix-free encoding/decoding of node names and destinations
 
@@ -50,8 +56,13 @@ Dspec = b"\x00"
 
 # Any other destination.  Must be between 1 and 127 bytes in length
 def Denc(dest):
+    dest = bytes(dest)
+    assert type(dest) is bytes
     assert len(dest) >= 1 and len(dest) <= 127
-    return bytes([len(dest)]) + dest
+    return bytes([ len(dest) ]) + dest
+
+def test_Denc():
+    assert Denc(bytes(b'dest')) == b'\x04dest'
 
 class SphinxException(Exception):
     pass

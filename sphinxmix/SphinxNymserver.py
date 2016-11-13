@@ -19,6 +19,9 @@
 
 from SphinxNode import pad_body
 
+# Python 2/3 compatibility
+from builtins import bytes
+
 class Nymserver:
     def __init__(self, params):
         self.params = params

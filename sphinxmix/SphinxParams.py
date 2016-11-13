@@ -22,20 +22,20 @@
 # from "Experimental implementation of the sphinx cryptographic mix
 # packet format by George Danezis".
 
-import os
-from SphinxNymserver import Nymserver
-
-from hashlib import sha256
-import hmac
 
 from os import urandom
+from hashlib import sha256
+import hmac
 
 from petlib.ec import EcGroup, EcPt, POINT_CONVERSION_UNCOMPRESSED
 from petlib.bn import Bn
 from petlib.cipher import Cipher
-
-
 import numpy
+
+# Python 2/3 compatibility
+from builtins import bytes
+
+from SphinxNymserver import Nymserver
 
 class Group_ECC:
     "Group operations in ECC"
@@ -91,7 +91,7 @@ def test_params():
     
     # Test XOR
     assert params.xor(b"AAA", b"AAA") == b"\x00\x00\x00"
-    x = os.urandom(20)
+    x = urandom(20)
     assert params.xor(x, x)[-1:] == b"\x00"
 
     # Test Lioness
@@ -124,15 +124,19 @@ class SphinxParams:
         self.nymserver = Nymserver(self)
 
     def xor(self, data, key):
+        data = bytes(data)
+        key = bytes(key)
         assert len(data) == len(key)
         assert type(data) is bytes and type(key) is bytes
         # Select the type size in bytes       
         dt = numpy.dtype('B');
-        return numpy.bitwise_xor(numpy.fromstring(key, dtype=dt), numpy.fromstring(data, dtype=dt)).tostring()
+        return bytes(numpy.bitwise_xor(numpy.fromstring(key, dtype=dt), numpy.fromstring(data, dtype=dt)).tostring())
 
     # The LIONESS PRP
 
     def aes_ctr(self, k, m):
+        k = bytes(k)
+        m = bytes(m)
         assert type(k) is bytes and type(m) is bytes
         iv = b"\x00" * 16
         c = self.aes.enc(k, iv).update(m)

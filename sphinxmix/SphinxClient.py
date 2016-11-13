@@ -20,6 +20,10 @@
 
 
 from os import urandom
+
+# Python 2/3 compatibility
+from builtins import bytes
+
 from SphinxParams import SphinxParams
 from SphinxNode import SphinxTestNode, Denc, Dspec, pad_body, unpad_body
 from SphinxNymserver import Nymserver
