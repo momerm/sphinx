@@ -27,22 +27,31 @@ import re
 re_compiled = re.compile("\x7f\xff*$")
 
 def pad_body(msgtotalsize, body):
-    body = body + "\x7f"
-    body = body + ("\xff" * (msgtotalsize - len(body)))
+    body = body + b"\x7f"
+    body = body + (b"\xff" * (msgtotalsize - len(body)))
     return body
 
 def unpad_body(body):
-    return re_compiled.sub('', body)
+    l = len(body) - 1
+    x_marker = b"\x7f"[0]
+    f_marker = b"\xff"[0]
+    while body[l] == f_marker and l > 0:
+        l -= 1
+        break
+    if body[l] == x_marker:
+        return body[:l]
+    else:
+        return b''
 
 # Prefix-free encoding/decoding of node names and destinations
 
 # The special destination
-Dspec = "\x00"
+Dspec = b"\x00"
 
 # Any other destination.  Must be between 1 and 127 bytes in length
 def Denc(dest):
     assert len(dest) >= 1 and len(dest) <= 127
-    return chr(len(dest)) + dest
+    return bytes([len(dest)]) + dest
 
 class SphinxException(Exception):
     pass
@@ -73,7 +82,7 @@ def sphinx_process(params, secret, seen, header, delta):
 
     seen[tag] = 1
 
-    B = p.xor(beta + ("\x00" * (2 * p.k)), p.rho(p.hrho(s)))
+    B = p.xor(beta + (b"\x00" * (2 * p.k)), p.rho(p.hrho(s)))
 
     type, val, rest = PFdecode(params, B)
 
@@ -87,7 +96,7 @@ def sphinx_process(params, secret, seen, header, delta):
 
     if type == "Dspec":
         delta = p.pii(p.hpi(s), delta)
-        if delta[:p.k] == ("\x00" * p.k):
+        if delta[:p.k] == (b"\x00" * p.k):
             type2, val, rest = PFdecode(params, delta[p.k:])
             if type2 == "dest":
                 body = unpad_body(rest)
@@ -102,18 +111,22 @@ def sphinx_process(params, secret, seen, header, delta):
 # Sphinx nodes
 
 def Nenc(param, idnum):
-    id = "\xff" + idnum + ("\x00" * (param.k - len(idnum) - 1))
+    id = b"\xff" + idnum + (b"\x00" * (param.k - len(idnum) - 1))
     assert len(id) == param.k
     return id
 
 # Decode the prefix-free encoding.  Return the type, value, and the
 # remainder of the input string
 def PFdecode(param, s):
-    if s == "": return None, None, None
-    if s[0] == '\x00': return 'Dspec', None, s[1:]
-    if s[0] == '\xff': return 'node', s[:param.k], s[param.k:]
-    l = ord(s[0])
+    assert type(s) is bytes
+    if s == b"": return None, None, None
+    if s[:1] == b'\x00': return 'Dspec', None, s[1:]
+    if s[:1] == b'\xff': return 'node', s[:param.k], s[param.k:]
+    l = s[0]
     if l < 128: return 'dest', s[1:l+1], s[l+1:]
+    
+    print(s)
+    assert False
     return None, None, None
 
 
@@ -135,7 +148,7 @@ class SphinxTestNode:
         
 
         self.id = Nenc(self.p, idnum)
-        self.name = "Node " + idnum.encode("hex")
+        self.name = b"Node " + idnum # .encode("hex")
         
         # The list of seen packets
         self.seen = {}
@@ -147,7 +160,7 @@ class SphinxTestNode:
 
         RET = sphinx_process(self.p, self._x, {}, header, delta)
 
-        print "Processing at", self.name
+        print("Processing at", self.name)
 
         p = self.p
         pki = p.pki
@@ -160,7 +173,7 @@ class SphinxTestNode:
 
         if type_code == "Process":
             (_, ((type2, val), body) ) = RET
-            print "Deliver [%s] to [%s]" % (body, val)
+            print("Deliver [%s] to [%s]" % (body, val))
             return 
 
         if type_code == "Client":
@@ -168,5 +181,5 @@ class SphinxTestNode:
             if val in p.clients:
                 return p.clients[val].process(idc, delta)
             else:
-                print "No such client [%s]" % val
+                print("No such client [%s]" % val)
                 return

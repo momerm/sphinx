@@ -33,8 +33,11 @@ def rand_subset(lst, nu):
     nodeids.sort(key=lambda x:x[0])
 
     # Return the first nu elements of the randomized list
-    return map(lambda x:x[1], nodeids[:nu])
+    return list(map(lambda x:x[1], nodeids[:nu]))
 
+
+from collections import namedtuple
+header_record = namedtuple("header_record", ["alpha", "s", "b"])
 
 def create_header(params, nodelist, dest, id):
     p = params
@@ -55,32 +58,32 @@ def create_header(params, nodelist, dest, id):
         s = group.expon(pki[node].y, blind_factor)
         b = p.hb(alpha, s)
         blind_factor = blind_factor.mod_mul(b, p.group.G.order())
-        
-        asbtuples.append({ 'alpha': alpha, 's': s, 'b': b})
+        hr = header_record(alpha, s, b)
+        asbtuples.append(hr)
 
     # Compute the filler strings
-    phi = ''
-    for i in xrange(1,nu):
+    phi = b''
+    for i in range(1,nu):
         min = (2*(p.r-i)+3)*p.k
-        phi = p.xor(phi + ("\x00" * (2*p.k)),
-            p.rho(p.hrho(asbtuples[i-1]['s']))[min:])
+        phi = p.xor(phi + (b"\x00" * (2*p.k)),
+            p.rho(p.hrho(asbtuples[i-1].s))[min:])
     
     # Compute the (beta, gamma) tuples
     # The os.urandom used to be a string of 0x00 bytes, but that's wrong
     beta = dest + id + urandom(((2 * (p.r - nu) + 2)*p.k - len(dest)))
     beta = p.xor(beta,
-        p.rho(p.hrho(asbtuples[nu-1]['s']))[:(2*(p.r-nu)+3)*p.k]) + phi
-    gamma = p.mu(p.hmu(asbtuples[nu-1]['s']), beta)
+        p.rho(p.hrho(asbtuples[nu-1].s))[:(2*(p.r-nu)+3)*p.k]) + phi
+    gamma = p.mu(p.hmu(asbtuples[nu-1].s), beta)
     
-    for i in xrange(nu-2, -1, -1):
+    for i in range(nu-2, -1, -1):
         id = nodelist[i+1]
         assert len(id) == p.k
         beta = p.xor(id + gamma + beta[:(2*p.r-1)*p.k],
-            p.rho(p.hrho(asbtuples[i]['s']))[:(2*p.r+1)*p.k])
-        gamma = p.mu(p.hmu(asbtuples[i]['s']), beta)
+            p.rho(p.hrho(asbtuples[i].s))[:(2*p.r+1)*p.k])
+        gamma = p.mu(p.hmu(asbtuples[i].s), beta)
     
-    return (asbtuples[0]['alpha'], beta, gamma), \
-        [x['s'] for x in asbtuples]
+    return (asbtuples[0].alpha, beta, gamma), \
+        [x.s for x in asbtuples]
 
 
 def create_forward_message(params, nodelist, dest, msg):
@@ -92,13 +95,13 @@ def create_forward_message(params, nodelist, dest, msg):
 
     # Compute the header and the secrets
     header, secrets = create_header(params, nodelist, Dspec,
-        "\x00" * p.k)
+        b"\x00" * p.k)
 
-    body = pad_body(p.m, ("\x00" * p.k) + Denc(dest) + msg)
+    body = pad_body(p.m, (b"\x00" * p.k) + Denc(dest) + msg)
 
     # Compute the delta values
     delta = p.pi(p.hpi(secrets[nu-1]), body)
-    for i in xrange(nu-2, -1, -1):
+    for i in range(nu-2, -1, -1):
         delta = p.pi(p.hpi(secrets[i]), delta)
 
     return header, delta
@@ -120,7 +123,7 @@ def create_surb(params, nodelist, dest):
 
 class SphinxClient:
     def __init__(self, params):
-        self.id = "Client " + urandom(4).encode("hex")
+        self.id = b"Client " + urandom(4) # .encode("hex")
         self.params = params
         params.clients[self.id] = self
         self.keytable = {}
@@ -141,27 +144,27 @@ class SphinxClient:
         p = self.params
         keytuple = self.keytable.pop(id, None)
         if keytuple == None:
-            print "Unreadable reply message received by [%s]" % self.id
+            print("Unreadable reply message received by [%s]" % self.id)
             return
 
         ktilde = keytuple.pop(0)
         nu = len(keytuple)
-        for i in xrange(nu-1, -1, -1):
+        for i in range(nu-1, -1, -1):
             delta = p.pi(keytuple[i], delta)
         delta = p.pii(ktilde, delta)
 
-        if delta[:p.k] == ("\x00" * p.k):
+        if delta[:p.k] == (b"\x00" * p.k):
             msg = unpad_body(delta[p.k:])
-            print "[%s] received by [%s]" % (msg, self.id)
+            print("[%s] received by [%s]" % (msg, self.id))
         else:
-            print "Corrupted message received by [%s]" % self.id
+            print("Corrupted message received by [%s]" % self.id)
 
 def test_FullClient():
     r = 5
     params = SphinxParams(r)
 
     # Create some nodes
-    for i in xrange(2*r):
+    for i in range(2*r):
         SphinxTestNode(params)
 
     # Create a client
@@ -170,23 +173,23 @@ def test_FullClient():
     # Pick a list of nodes to use
     use_nodes = rand_subset(params.pki.keys(), r)
 
-    header, delta = create_forward_message(params, use_nodes, "dest", "this is a test")
+    header, delta = create_forward_message(params, use_nodes, b"dest", b"this is a test")
 
     # Send it to the first node for processing
     params.pki[use_nodes[0]].process(header, delta)
 
     # Create a reply block for the client
-    client.create_nym("cypherpunk", r)
+    client.create_nym(b"cypherpunk", r)
 
     # Send a message to it
-    params.nymserver.send_to_nym("cypherpunk", "this is a reply")
+    params.nymserver.send_to_nym(b"cypherpunk", b"this is a reply")
 
 def test_timing():
     r = 5
     params = SphinxParams(r)
 
     # Create some nodes
-    for i in xrange(2*r):
+    for i in range(2*r):
         SphinxTestNode(params)
 
     # Create a client
@@ -200,7 +203,7 @@ def test_timing():
     import time
     t0 = time.time()
     for _ in range(100):
-        header, delta = create_forward_message(params, use_nodes, "dest", "this is a test")
+        header, delta = create_forward_message(params, use_nodes, b"dest", b"this is a test")
     t1 = time.time()
     print("Time per mix encoding: %.2fms" % ((t1-t0)*1000.0/100))
 

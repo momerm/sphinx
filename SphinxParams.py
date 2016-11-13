@@ -30,7 +30,7 @@ import hmac
 
 from os import urandom
 
-from petlib.ec import EcGroup, EcPt
+from petlib.ec import EcGroup, EcPt, POINT_CONVERSION_UNCOMPRESSED
 from petlib.bn import Bn
 from petlib.cipher import Cipher
 
@@ -73,7 +73,7 @@ class Group_ECC:
         return self.G.check_point(b)
 
     def printable(self, alpha):
-        return alpha.export() # .encode("hex")
+        return alpha.export(POINT_CONVERSION_UNCOMPRESSED) # .encode("hex")
 
 def test_group():
     G = Group_ECC()
@@ -90,21 +90,21 @@ def test_params():
     params = SphinxParams()
     
     # Test XOR
-    assert params.xor("AAA", "AAA") == "\x00\x00\x00"
+    assert params.xor(b"AAA", b"AAA") == b"\x00\x00\x00"
     x = os.urandom(20)
-    assert params.xor(x, x)[-1] == "\x00"
+    assert params.xor(x, x)[-1:] == b"\x00"
 
     # Test Lioness
-    k = "A" * 16
-    m = "ARG"* 16
+    k = b"A" * 16
+    m = b"ARG"* 16
 
     c = params.lioness_enc(k,m)
     m2 = params.lioness_dec(k, c)
     assert m == m2
 
     k = urandom(16)
-    c = params.aes_ctr(k, "Hello World!")
-    assert params.aes_ctr(k, c) == "Hello World!"
+    c = params.aes_ctr(k, b"Hello World!")
+    assert params.aes_ctr(k, c) == b"Hello World!"
 
 class SphinxParams:
     k = 16 # in bytes, == 128 bits
@@ -125,6 +125,7 @@ class SphinxParams:
 
     def xor(self, data, key):
         assert len(data) == len(key)
+        assert type(data) is bytes and type(key) is bytes
         # Select the type size in bytes       
         dt = numpy.dtype('B');
         return numpy.bitwise_xor(numpy.fromstring(key, dtype=dt), numpy.fromstring(data, dtype=dt)).tostring()
@@ -132,7 +133,8 @@ class SphinxParams:
     # The LIONESS PRP
 
     def aes_ctr(self, k, m):
-        iv = "\x00" * 16
+        assert type(k) is bytes and type(m) is bytes
+        iv = b"\x00" * 16
         c = self.aes.enc(k, iv).update(m)
         return c
 
@@ -140,7 +142,7 @@ class SphinxParams:
         assert len(key) == self.k
         assert len(message) >= self.k * 2
         # Round 1
-        r1 = self.xor(self.hash(message[self.k:]+key+'1')[:self.k],
+        r1 = self.xor(self.hash(message[self.k:]+key+b'1')[:self.k],
                 message[:self.k]) + message[self.k:]
 
         # Round 2
@@ -149,7 +151,7 @@ class SphinxParams:
         r2 = r1[:self.k] + c
 
         # Round 3
-        r3 = self.xor(self.hash(r2[self.k:]+key+'3')[:self.k], r2[:self.k]) + r2[self.k:]
+        r3 = self.xor(self.hash(r2[self.k:]+key+b'3')[:self.k], r2[:self.k]) + r2[self.k:]
 
         # Round 4
         k4 = self.xor(r3[:self.k], key)
@@ -170,7 +172,7 @@ class SphinxParams:
         r3 = r4[:self.k] + c # c.encrypt(r4[self.k:])
 
         # Round 3
-        r2 = self.xor(self.hash(r3[self.k:]+key+'3')[:self.k], r3[:self.k]) + r3[self.k:]
+        r2 = self.xor(self.hash(r3[self.k:]+key+b'3')[:self.k], r3[:self.k]) + r3[self.k:]
 
         # Round 2
         k2 = self.xor(r2[:self.k], key)
@@ -178,14 +180,14 @@ class SphinxParams:
         r1 = r2[:self.k] + c # c.encrypt(r2[self.k:])
 
         # Round 1
-        r0 = self.xor(self.hash(r1[self.k:]+key+'1')[:self.k], r1[:self.k]) + r1[self.k:]
+        r0 = self.xor(self.hash(r1[self.k:]+key+b'1')[:self.k], r1[:self.k]) + r1[self.k:]
 
         return r0
 
     # The PRG; key is of length k, output is of length (2r+3)k
     def rho(self, key):
         assert len(key) == self.k
-        p = "\x00" * ( (2 * self.r + 3) * self.k )
+        p = b"\x00" * ( (2 * self.r + 3) * self.k )
         return self.aes_ctr(key, p)
 
     # The HMAC; key is of length k, output is of length k
@@ -215,30 +217,30 @@ class SphinxParams:
     def hb(self, alpha, s):
         "Compute a hash of alpha and s to use as a blinding factor"
         group = self.group
-        return group.makeexp(self.hash("hb:" + group.printable(alpha)
-            + " , " + group.printable(s)))
+        return group.makeexp(self.hash(b"hb:" + group.printable(alpha)
+            + b" , " + group.printable(s)))
 
     def hrho(self, s):
         "Compute a hash of s to use as a key for the PRG rho"
         group = self.group
-        return (self.hash("hrho:" + group.printable(s)))[:self.k]
+        return (self.hash(b"hrho:" + group.printable(s)))[:self.k]
 
     def hmu(self, s):
         "Compute a hash of s to use as a key for the HMAC mu"
         group = self.group
-        return (self.hash("hmu:" + group.printable(s)))[:self.k]
+        return (self.hash(b"hmu:" + group.printable(s)))[:self.k]
 
     def hpi(self, s):
         "Compute a hash of s to use as a key for the PRP pi"
         group = self.group
-        return (self.hash("hpi:" + group.printable(s)))[:self.k]
+        return (self.hash(b"hpi:" + group.printable(s)))[:self.k]
 
     def htau(self, s):
         "Compute a hash of s to use to see if we've seen s before"
         group = self.group
-        return (self.hash("htau:" + group.printable(s)))
+        return (self.hash(b"htau:" + group.printable(s)))
 
 if __name__ == '__main__':
     p = SphinxParams(5, True)
-    print p.hb(p.group.g, p.group.g).encode("hex")
-    print p.rho("1234" * 4).encode("hex")
+    print(p.hb(p.group.g, p.group.g).encode("hex"))
+    print(p.rho("1234" * 4).encode("hex"))
