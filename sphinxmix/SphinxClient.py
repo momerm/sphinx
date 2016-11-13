@@ -42,10 +42,10 @@ def rand_subset(lst, nu):
 
 from collections import namedtuple
 header_record = namedtuple("header_record", ["alpha", "s", "b"])
+pki_entry = namedtuple("pki_entry", ["id", "x", "y"])
 
 def create_header(params, nodelist, pki, dest, id):
     p = params
-    # pki = p.pki
     nu = len(nodelist)
     assert nu <= p.r
     assert len(id) == p.k
@@ -171,7 +171,7 @@ def test_FullClient():
     params = SphinxParams(r)
     pki = {}
     nymserver = Nymserver(params, pki)
-
+    
     # Create some nodes
     for i in range(2*r):
         node = SphinxTestNode(params, pki)
@@ -234,6 +234,48 @@ def test_timing():
     t1 = time.time()
     print("Time per mix processing: %.2fms" % ((t1-t0)*1000.0/100))
 
+
+def test_minimal():
+    
+    
+    from SphinxParams import SphinxParams
+    r = 5
+    params = SphinxParams(r)
+
+    # The minimal PKI involves names of nodes and keys
+    from SphinxNode import Nenc
+    
+    pki = {}
+    for i in range(2*r):
+        nid = Nenc(params, bytes([i]))
+        x = params.group.gensecret()
+        y = params.group.expon(params.group.g, x)
+        pki[nid] = pki_entry(nid, x, y)
+
+    # The simplest path selection algorithm and message packaging
+    use_nodes = rand_subset(pki.keys(), r)
+    dest = b"bob"
+    message = b"this is a test"
+    header, delta = create_forward_message(params, use_nodes, pki, dest, message)
+
+    # Process message by the sequence of mixes
+    from .SphinxNode import sphinx_process
+    x = pki[use_nodes[0]].x
+
+    while True:
+        seen = {}
+        ret = sphinx_process(params, x, seen, header, delta)
+        if ret[0] == "Node":
+            _, (addr, header, delta) = ret
+            x = pki[addr].x 
+        elif ret[0] == "Process":
+            print(ret[1])
+            break
+        else:
+            print("Error")
+            assert False
+            break
+    
 
 if __name__ == "__main__":
     test_timing() 
