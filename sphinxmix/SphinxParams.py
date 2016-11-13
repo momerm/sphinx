@@ -35,8 +35,6 @@ import numpy
 # Python 2/3 compatibility
 from builtins import bytes
 
-from SphinxNymserver import Nymserver
-
 class Group_ECC:
     "Group operations in ECC"
 
@@ -109,9 +107,8 @@ def test_params():
 class SphinxParams:
     k = 16 # in bytes, == 128 bits
     m = 1024 # size of message body, in bytes
-    pki = {} # mapping of node id to node
-    clients = {} # mapping of destinations to clients
-
+    # pki = {} # mapping of node id to node
+    # clients = {} # mapping of destinations to clients
 
     def __init__(self, r=5, group=None):
         self.r = r
@@ -121,7 +118,7 @@ class SphinxParams:
         if not group:
             self.group = Group_ECC()
 
-        self.nymserver = Nymserver(self)
+        # self.nymserver = Nymserver(self)
 
     def xor(self, data, key):
         data = bytes(data)

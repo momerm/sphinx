@@ -19,15 +19,12 @@
 # <http://www.gnu.org/licenses/>.
 
 from os import urandom
-import re
 
 # Python 2/3 compatibility
 from builtins import bytes
 
 # Padding/unpadding of message bodies: a 0 bit, followed by as many 1
 # bits as it takes to fill it up
-
-re_compiled = re.compile("\x7f\xff*$")
 
 def pad_body(msgtotalsize, body):
     body = body + b"\x7f"
@@ -143,7 +140,7 @@ def PFdecode(param, s):
 
 class SphinxTestNode:
 
-    def __init__(self, params, secret=None):
+    def __init__(self, params, pki, secret=None):
         self.p = params
         group = self.p.group
 
@@ -165,7 +162,8 @@ class SphinxTestNode:
         self.seen = {}
 
         # A local mapping between IDs and Nodes
-        params.pki[self.id] = self
+        # params.pki[self.id] = self
+        self.pki = pki
 
     def process(self, header, delta):
 
@@ -174,8 +172,7 @@ class SphinxTestNode:
         print("Processing at", self.name)
 
         p = self.p
-        pki = p.pki
-        
+        pki = self.pki
 
         type_code = RET[0]
         if type_code == "Node":
@@ -189,8 +186,8 @@ class SphinxTestNode:
 
         if type_code == "Client":
             (_, ((val,idc), delta)) = RET            
-            if val in p.clients:
-                return p.clients[val].process(idc, delta)
+            if val in pki:
+                return pki[val].process(idc, delta)
             else:
                 print("No such client [%s]" % val)
                 return

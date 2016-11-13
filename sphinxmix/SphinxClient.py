@@ -24,9 +24,9 @@ from os import urandom
 # Python 2/3 compatibility
 from builtins import bytes
 
-from SphinxParams import SphinxParams
-from SphinxNode import SphinxTestNode, Denc, Dspec, pad_body, unpad_body
-from SphinxNymserver import Nymserver
+from .SphinxParams import SphinxParams
+from .SphinxNode import SphinxTestNode, Denc, Dspec, pad_body, unpad_body
+from .SphinxNymserver import Nymserver
 
 def rand_subset(lst, nu):
     """Return a list of nu random elements of the given list (without
@@ -43,9 +43,9 @@ def rand_subset(lst, nu):
 from collections import namedtuple
 header_record = namedtuple("header_record", ["alpha", "s", "b"])
 
-def create_header(params, nodelist, dest, id):
+def create_header(params, nodelist, pki, dest, id):
     p = params
-    pki = p.pki
+    # pki = p.pki
     nu = len(nodelist)
     assert nu <= p.r
     assert len(id) == p.k
@@ -90,7 +90,7 @@ def create_header(params, nodelist, dest, id):
         [x.s for x in asbtuples]
 
 
-def create_forward_message(params, nodelist, dest, msg):
+def create_forward_message(params, nodelist, pki, dest, msg):
     p = params
     # pki = p.pki
     nu = len(nodelist)
@@ -98,8 +98,7 @@ def create_forward_message(params, nodelist, dest, msg):
     assert p.k + 1 + len(dest) + len(msg) < p.m
 
     # Compute the header and the secrets
-    header, secrets = create_header(params, nodelist, Dspec,
-        b"\x00" * p.k)
+    header, secrets = create_header(params, nodelist, pki, Dspec, b"\x00" * p.k)
 
     body = pad_body(p.m, (b"\x00" * p.k) + Denc(dest) + msg)
 
@@ -110,14 +109,14 @@ def create_forward_message(params, nodelist, dest, msg):
 
     return header, delta
 
-def create_surb(params, nodelist, dest):
+def create_surb(params, nodelist, pki, dest):
     p = params
     # pki = p.pki
     nu = len(nodelist)
     id = urandom(p.k)
 
     # Compute the header and the secrets
-    header, secrets = create_header(params, nodelist, Denc(dest), id)
+    header, secrets = create_header(params, nodelist, pki, Denc(dest), id)
 
     ktilde = urandom(p.k)
     keytuple = [ktilde]
@@ -126,22 +125,26 @@ def create_surb(params, nodelist, dest):
 
 
 class SphinxClient:
-    def __init__(self, params):
+    def __init__(self, params, pki, nymserver):
         self.id = b"Client " + urandom(4) # .encode("hex")
         self.params = params
-        params.clients[self.id] = self
+        # params.clients[self.id] = self
         self.keytable = {}
+        self.pki = pki
+        self.nymserver = nymserver
 
     def create_nym(self, nym, nllength):
         """Create a SURB for the given nym (passing through nllength
         nodes), and send it to the nymserver."""
 
         # Pick the list of nodes to use
-        nodelist = rand_subset(self.params.pki.keys(), nllength)
-        id, keytuple, nymtuple = create_surb(self.params, nodelist, self.id)
+        pki = self.pki
+        mixnodes = [x for x in pki.keys() if isinstance(pki[x], SphinxTestNode)]
+        nodelist = rand_subset(mixnodes, nllength)
+        id, keytuple, nymtuple = create_surb(self.params, nodelist, self.pki, self.id)
 
         self.keytable[id] = keytuple
-        self.params.nymserver.add_surb(nym, nymtuple)
+        self.nymserver.add_surb(nym, nymtuple)
 
     def process(self, id, delta):
         "Process a (still-encrypted) reply message"
@@ -166,56 +169,66 @@ class SphinxClient:
 def test_FullClient():
     r = 5
     params = SphinxParams(r)
+    pki = {}
+    nymserver = Nymserver(params, pki)
 
     # Create some nodes
     for i in range(2*r):
-        SphinxTestNode(params)
+        node = SphinxTestNode(params, pki)
+        pki[node.id] = node
 
     # Create a client
-    client = SphinxClient(params)
+    client = SphinxClient(params, pki, nymserver)
+    pki[client.id] = client
 
     # Pick a list of nodes to use
-    use_nodes = rand_subset(params.pki.keys(), r)
+    mixnodes = [x for x in pki.keys() if isinstance(pki[x], SphinxTestNode)]
+    use_nodes = rand_subset(mixnodes, r)
 
-    header, delta = create_forward_message(params, use_nodes, b"dest", b"this is a test")
+    header, delta = create_forward_message(params, use_nodes, pki, b"dest", b"this is a test")
 
     # Send it to the first node for processing
-    params.pki[use_nodes[0]].process(header, delta)
+    pki[use_nodes[0]].process(header, delta)
 
     # Create a reply block for the client
     client.create_nym(b"cypherpunk", r)
 
     # Send a message to it
-    params.nymserver.send_to_nym(b"cypherpunk", b"this is a reply")
+    nymserver.send_to_nym(b"cypherpunk", b"this is a reply")
 
 def test_timing():
     r = 5
     params = SphinxParams(r)
+    pki = {}
+    nymserver = Nymserver(params, pki)
 
     # Create some nodes
     for i in range(2*r):
-        SphinxTestNode(params)
+        node = SphinxTestNode(params, pki)
+        pki[node.id] = node
 
     # Create a client
-    client = SphinxClient(params)
+    client = SphinxClient(params, pki, nymserver)
+    pki[client.id] = client
 
     # Pick a list of nodes to use
-    use_nodes = rand_subset(params.pki.keys(), r)
+    mixnodes = [x for x in pki.keys() if isinstance(pki[x], SphinxTestNode)]
+    use_nodes = rand_subset(mixnodes, r)
 
     print()
     
     import time
     t0 = time.time()
     for _ in range(100):
-        header, delta = create_forward_message(params, use_nodes, b"dest", b"this is a test")
+        header, delta = create_forward_message(params, use_nodes, pki, b"dest", b"this is a test")
     t1 = time.time()
     print("Time per mix encoding: %.2fms" % ((t1-t0)*1000.0/100))
 
-    from SphinxNode import sphinx_process
+    from .SphinxNode import sphinx_process
     import time
     t0 = time.time()
     for _ in range(100):
-        x = params.pki[use_nodes[0]]._x
+        x = pki[use_nodes[0]]._x
         sphinx_process(params, x, {}, header, delta)
         # header, delta = create_forward_message(params, use_nodes, "dest", "this is a test")
     t1 = time.time()
@@ -223,4 +236,4 @@ def test_timing():
 
 
 if __name__ == "__main__":
-    test_timing()
+    test_timing() 

@@ -17,14 +17,15 @@
 # License along with Sphinx.  If not, see
 # <http://www.gnu.org/licenses/>.
 
-from SphinxNode import pad_body
+from .SphinxNode import pad_body
 
 # Python 2/3 compatibility
 from builtins import bytes
 
 class Nymserver:
-    def __init__(self, params):
+    def __init__(self, params, pki):
         self.params = params
+        self.pki = pki
         self.database = {}
 
     def add_surb(self, nym, nymtuple):
@@ -36,7 +37,7 @@ class Nymserver:
 
     def send_to_nym(self, nym, message):
         p = self.params
-        pki = p.pki
+        pki = self.pki
         db = self.database
         print("Nymserver received message for [%s]" % nym)
         if nym in db and len(db[nym]) > 0:
