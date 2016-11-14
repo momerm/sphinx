@@ -122,6 +122,12 @@ def create_surb(params, nodelist, pki, dest):
     """Creates a Sphinx single use reply block (SURB) using a set of parameters;
     a sequence of mix identifiers; a pki mapping names of mixes to keys; and a final 
     destination.
+
+    Returns:
+        - A triplet (surbid, surbkeytuple, nymtuple). Where the surbid can be 
+          used as an index to store the secrets surbkeytuple; nymtuple is the actual
+          SURB that needs to be sent to the receiver.
+
     """
     p = params
     # pki = p.pki
@@ -136,6 +142,34 @@ def create_surb(params, nodelist, pki, dest):
     keytuple.extend(map(p.hpi, secrets))
     return id, keytuple, (nodelist[0], header, ktilde)
 
+def package_surb(params, nymtuple, message):
+    """Packages a message to be sent with a SURB. The message has to be bytes, 
+    and the nymtuple is the structure returned by the create_surb call.
+
+    Returns a header and a body to pass to the first mix.
+    """
+    n0, header0, ktilde = nymtuple
+    body = params.pi(ktilde, pad_body(params.m, (b"\x00" * params.k) + message))
+    return (header0, body)
+
+def receive_surb(params, keytuple, delta): 
+    """Processes a SURB body to extract the reply. The keytuple was provided at the time of 
+    SURB creation, and can be indexed by the SURB id, which is also returned to the receiving user.
+
+    Returns the decoded message.
+    """
+    p = params
+        
+    ktilde = keytuple.pop(0)
+    nu = len(keytuple)
+    for i in range(nu-1, -1, -1):
+        delta = p.pi(keytuple[i], delta)
+    delta = p.pii(ktilde, delta)
+
+    if delta[:p.k] == (b"\x00" * p.k):
+        msg = unpad_body(delta[p.k:])
+    
+    return msg
 
 class SphinxClient:
     """ An example Sphinx client class"""
@@ -251,8 +285,6 @@ def test_timing():
 
 
 def test_minimal():
-    
-    
     from .SphinxParams import SphinxParams
     r = 5
     params = SphinxParams(r)
@@ -293,7 +325,26 @@ def test_minimal():
             print("Error")
             assert False
             break
+
+    # Test the nym creation
+    surbid, surbkeytuple, nymtuple = create_surb(params, use_nodes, pkiPub, b"myself")
     
+    message = b"This is a reply"
+    header, delta = package_surb(params, nymtuple, message)
+
+    x = pkiPriv[use_nodes[0]].x
+
+    while True:
+        seen = {}
+        ret = sphinx_process(params, x, seen, header, delta)
+        if ret[0] == "Node":
+            _, (addr, header, delta) = ret
+            x = pkiPriv[addr].x 
+        elif ret[0] == "Client":
+            (myname, myid), delta = ret[1]
+            break
+
+    received = receive_surb(params, surbkeytuple, delta)
 
 if __name__ == "__main__":
     test_timing() 

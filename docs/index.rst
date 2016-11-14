@@ -41,6 +41,16 @@ Core classes and functions
 
 .. autofunction:: sphinxmix.SphinxNode.sphinx_process
 
+SURB functions
+--------------
+
+.. autofunction:: sphinxmix.SphinxClient.create_surb
+
+.. autofunction:: sphinxmix.SphinxClient.package_surb
+
+.. autofunction:: sphinxmix.SphinxClient.receive_surb
+
+
 Indices and tables
 ==================
 
