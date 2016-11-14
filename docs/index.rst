@@ -12,6 +12,18 @@ Introduction
 .. automodule:: sphinxmix
    :members:
 
+Development
+-----------
+
+The ``pytest`` unit tests and doctests of ``sphinxmix`` may be ran using ``tox`` simply through the command::
+
+	$ tox
+
+To upload a new distribution of ``sphinxmix`` the maintainer simply uses::
+
+	$ python setup.py sdist upload
+
+
 Core classes and functions
 --------------------------
 

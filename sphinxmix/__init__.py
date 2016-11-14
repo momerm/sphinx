@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """The ``sphinxmix`` package implements the Sphinx mix packet format core cryptographic functions.
 
+The paper describing sphinx may be found here:
+
+    * George Danezis and Ian Goldberg. Sphinx: A Compact and Provably Secure Mix Format. IEEE Symposium on Security and Privacy 2009. [`link <http://www.cypherpunks.ca/~iang/pubs/Sphinx_Oakland09.pdf>`_]
+
+
 All the ``sphinxmix`` cryptography is encapsulated and within a ``SphinxParams`` object that 
 is used by all subsequent functions. To make ``sphinxmix`` use different cryptographic 
 primitives simply extend this class, or re-implement it. The default cryptographic primitives 
