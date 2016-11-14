@@ -15,7 +15,7 @@ setup(name='sphinxmix',
       setup_requires=["pytest >= 2.6.4"],
       install_requires=[
             "future >= 0.14.3",
-            "pytest >= 2.6.4",
+            "pytest >= 2.5.0",
             "msgpack-python >= 0.4.6",
             "petlib >= 0.0.38",
             "numpy >= 1.11.0",

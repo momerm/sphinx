@@ -20,6 +20,7 @@
 
 
 from os import urandom
+from collections import namedtuple
 
 # Python 2/3 compatibility
 from builtins import bytes
@@ -27,6 +28,11 @@ from builtins import bytes
 from .SphinxParams import SphinxParams
 from .SphinxNode import SphinxTestNode, Denc, Dspec, pad_body, unpad_body
 from .SphinxNymserver import Nymserver
+
+
+header_record = namedtuple("header_record", ["alpha", "s", "b"])
+pki_entry = namedtuple("pki_entry", ["id", "x", "y"])
+
 
 def rand_subset(lst, nu):
     """Return a list of nu random elements of the given list (without
@@ -40,11 +46,9 @@ def rand_subset(lst, nu):
     return list(map(lambda x:x[1], nodeids[:nu]))
 
 
-from collections import namedtuple
-header_record = namedtuple("header_record", ["alpha", "s", "b"])
-pki_entry = namedtuple("pki_entry", ["id", "x", "y"])
-
 def create_header(params, nodelist, pki, dest, id):
+    """ Internal function, creating a Sphinx header, given parameters, a node list (path), 
+    a pki mapping node names to keys, a desitination, and a message identifier.""" 
     p = params
     nu = len(nodelist)
     assert nu <= p.r
@@ -91,6 +95,11 @@ def create_header(params, nodelist, pki, dest, id):
 
 
 def create_forward_message(params, nodelist, pki, dest, msg):
+    """Creates a forward Sphix message, ready to be processed by a first mix. 
+
+    It takes as parameters a node list of mix ids, forming the path of the message;
+    a pki mapping mode names to keys; a destination and a message (byte arrays)."""
+
     p = params
     # pki = p.pki
     nu = len(nodelist)
@@ -110,6 +119,10 @@ def create_forward_message(params, nodelist, pki, dest, msg):
     return header, delta
 
 def create_surb(params, nodelist, pki, dest):
+    """Creates a Sphinx single use reply block (SURB) using a set of parameters;
+    a sequence of mix identifiers; a pki mapping names of mixes to keys; and a final 
+    destination.
+    """
     p = params
     # pki = p.pki
     nu = len(nodelist)
@@ -125,6 +138,8 @@ def create_surb(params, nodelist, pki, dest):
 
 
 class SphinxClient:
+    """ An example Sphinx client class"""
+
     def __init__(self, params, pki, nymserver):
         self.id = b"Client " + urandom(4) # .encode("hex")
         self.params = params
@@ -238,12 +253,12 @@ def test_timing():
 def test_minimal():
     
     
-    from SphinxParams import SphinxParams
+    from .SphinxParams import SphinxParams
     r = 5
     params = SphinxParams(r)
 
     # The minimal PKI involves names of nodes and keys
-    from SphinxNode import Nenc
+    from .SphinxNode import Nenc
     
     pkiPriv = {}
     pkiPub = {}

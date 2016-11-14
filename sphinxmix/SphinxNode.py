@@ -27,11 +27,13 @@ from builtins import bytes
 # bits as it takes to fill it up
 
 def pad_body(msgtotalsize, body):
+    """ Unpad the Sphinx message body."""
     body = body + b"\x7f"
     body = body + (b"\xff" * (msgtotalsize - len(body)))
     return body
 
 def unpad_body(body):
+    """ Pad a Sphinx message body. """
     body = bytes(body)
     l = len(body) - 1
     x_marker = bytes(b"\x7f")[0]
@@ -66,7 +68,11 @@ class SphinxException(Exception):
 
 # Core Process function -- devoid of any chrome
 def sphinx_process(params, secret, seen, header, delta):
-    # print "Processing at", self.name
+    """ The heart of a Sphinx server, that processes incoming messages.
+
+    It takes a set of parameters, the secret of the server, the dictionary of seen messages,
+    and an incoming message header and body.
+     """
     p = params
     group = p.group
 
@@ -119,6 +125,7 @@ def sphinx_process(params, secret, seen, header, delta):
 # Sphinx nodes
 
 def Nenc(param, idnum):
+    """ The encoding of mix names. """
     id = b"\xff" + idnum + (b"\x00" * (param.k - len(idnum) - 1))
     assert len(id) == param.k
     return id
@@ -126,6 +133,7 @@ def Nenc(param, idnum):
 # Decode the prefix-free encoding.  Return the type, value, and the
 # remainder of the input string
 def PFdecode(param, s):
+    """ Decoder of prefix free encoder for commands."""
     assert type(s) is bytes
     if s == b"": return None, None, None
     if s[:1] == b'\x00': return 'Dspec', None, s[1:]
@@ -139,6 +147,7 @@ def PFdecode(param, s):
 
 
 class SphinxTestNode:
+    """ A Sphinx Test Node class."""
 
     def __init__(self, params, pki, secret=None):
         self.p = params
