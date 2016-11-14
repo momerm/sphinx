@@ -6,8 +6,15 @@
 The sphinxmix package documentation
 ===================================
 
-Introduction
-------------
+Installing
+----------
+
+Install using `pip` through the command::
+
+	$ pip install sphinxmix
+
+Basic usage
+-----------
 
 .. automodule:: sphinxmix
    :members:
