@@ -126,10 +126,12 @@ def create_header(params, nodelist, pki, dest, mid):
         # Debug info
         plain_beta_len2 = (2*p.r-1)*p.k
         assert plain_beta_len == plain_beta_len2
-        assert plain_beta_len + len(node_id) + p.k
+        assert plain_beta_len + len(node_id) + p.k == (2*p.r+1)*p.k
+
+        plain_len = plain_beta_len + len(node_id) + p.k
 
         plain = node_id + gamma + beta[:plain_beta_len]
-        blind = p.rho(p.hrho(asbtuples[i].s))[:(2*p.r+1)*p.k]
+        blind = p.rho(p.hrho(asbtuples[i].s))[:plain_len]
         assert len(plain) == len(blind)
 
         beta = p.xor(plain, blind)
