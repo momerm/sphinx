@@ -185,10 +185,14 @@ class SphinxParams:
 
         return r0
 
-    # The PRG; key is of length k, output is of length (2r+3)k
-    def rho(self, key):
+    # The PRG; key is of length k, output is of length (2r+3)k or other
+    def rho(self, key, other=None):
         assert len(key) == self.k
-        p = b"\x00" * ( (2 * self.r + 3) * self.k )
+        xlen = ( (2 * self.r + 3) * self.k )
+        if other:
+            xlen = other
+
+        p = b"\x00" * xlen
         return self.aes_ctr(key, p)
 
     # The HMAC; key is of length k, output is of length k

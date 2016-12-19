@@ -46,14 +46,20 @@ def rand_subset(lst, nu):
     return list(map(lambda x:x[1], nodeids[:nu]))
 
 
-def create_header(params, nodelist, pki, dest, id):
+def create_header(params, nodelist, pki, dest, mid):
     """ Internal function, creating a Sphinx header, given parameters, a node list (path), 
-    a pki mapping node names to keys, a desitination, and a message identifier.""" 
+    a pki mapping node names to keys, a destination, and a message identifier.""" 
+    node_meta = [n for n in nodelist]
+
     p = params
     nu = len(nodelist)
+
+    max_len = 2*p.r*p.k + 3*p.k
+
     assert nu <= p.r
-    assert len(id) == p.k
+    assert len(mid) == p.k
     assert len(dest) <= 2 * (p.r - nu + 1) * p.k
+    
     group = p.group
     x = group.gensecret()
 
@@ -66,28 +72,67 @@ def create_header(params, nodelist, pki, dest, id):
         s = group.expon(pki[node].y, blind_factor)
         b = p.hb(alpha, s)
         blind_factor = blind_factor.mod_mul(b, p.group.G.order())
+        
         hr = header_record(alpha, s, b)
         asbtuples.append(hr)
 
     # Compute the filler strings
     phi = b''
     for i in range(1,nu):
-        min = (2*(p.r-i)+3)*p.k
-        phi = p.xor(phi + (b"\x00" * (2*p.k)),
-            p.rho(p.hrho(asbtuples[i-1].s))[min:])
+        # min = (2*(p.r-i) + 3)*p.k
+        len_meta = sum(map(len,node_meta[:i]))
+
+        min_len = max_len - i*p.k - len_meta
+
+        # Debug info
+        min_len2 = 2*(p.r-i)*p.k + 3*p.k
+        assert min_len == min_len2
+
+        plain = phi + (b"\x00" * (p.k + len(node_meta[i])))
+        blind = p.rho(p.hrho(asbtuples[i-1].s))[min_len:]
+        assert len(plain) == len(blind)
+
+        phi = p.xor(plain, blind)
     
     # Compute the (beta, gamma) tuples
     # The os.urandom used to be a string of 0x00 bytes, but that's wrong
-    beta = dest + id + urandom(((2 * (p.r - nu) + 2)*p.k - len(dest)))
-    beta = p.xor(beta,
-        p.rho(p.hrho(asbtuples[nu-1].s))[:(2*(p.r-nu)+3)*p.k]) + phi
+    
+    len_meta = sum(map(len,node_meta))    
+    random_pad_len = max_len - len_meta - (nu + 1)*p.k - len(dest)
+    
+    # Debug info
+    random_pad_len2 = ((2 * (p.r - nu) + 2)*p.k - len(dest))
+    assert random_pad_len == random_pad_len2
+
+    beta = dest + mid + urandom(random_pad_len)
+
+    # Debug info
+    len_beta = (2*(p.r-nu)+3)*p.k
+    assert len(beta) == len_beta
+
+    blind = p.rho(p.hrho(asbtuples[nu-1].s))[:len(beta)]
+    assert len(beta) == len(blind)
+
+    beta = p.xor(beta, blind) + phi
     gamma = p.mu(p.hmu(asbtuples[nu-1].s), beta)
     
     for i in range(nu-2, -1, -1):
-        id = nodelist[i+1]
-        assert len(id) == p.k
-        beta = p.xor(id + gamma + beta[:(2*p.r-1)*p.k],
-            p.rho(p.hrho(asbtuples[i].s))[:(2*p.r+1)*p.k])
+        node_id = nodelist[i+1]
+        assert len(node_id) == p.k
+
+        
+        plain_beta_len = max_len - 3*p.k - len(node_id)
+        
+        # Debug info
+        plain_beta_len2 = (2*p.r-1)*p.k
+        assert plain_beta_len == plain_beta_len2
+        assert plain_beta_len + len(node_id) + p.k
+
+        plain = node_id + gamma + beta[:plain_beta_len]
+        blind = p.rho(p.hrho(asbtuples[i].s))[:(2*p.r+1)*p.k]
+        assert len(plain) == len(blind)
+
+        beta = p.xor(plain, blind)
         gamma = p.mu(p.hmu(asbtuples[i].s), beta)
     
     return (asbtuples[0].alpha, beta, gamma), \
