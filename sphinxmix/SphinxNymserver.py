@@ -22,27 +22,27 @@ from .SphinxNode import pad_body
 # Python 2/3 compatibility
 from builtins import bytes
 
-class Nymserver:
-    def __init__(self, params, pki):
-        self.params = params
-        self.pki = pki
-        self.database = {}
+# class Nymserver:
+#     def __init__(self, params, pki):
+#         self.params = params
+#         self.pki = pki
+#         self.database = {}
 
-    def add_surb(self, nym, nymtuple):
-        db = self.database
-        if nym in db:
-            db[nym].append(nymtuple)
-        else:
-            db[nym] = [nymtuple]
+#     def add_surb(self, nym, nymtuple):
+#         db = self.database
+#         if nym in db:
+#             db[nym].append(nymtuple)
+#         else:
+#             db[nym] = [nymtuple]
 
-    def send_to_nym(self, nym, message):
-        p = self.params
-        pki = self.pki
-        db = self.database
-        print("Nymserver received message for [%s]" % nym)
-        if nym in db and len(db[nym]) > 0:
-            n0, header0, ktilde = db[nym].pop(0)
-            body = p.pi(ktilde, pad_body(p.m, (b"\x00" * p.k) + message))
-            pki[n0].process(header0, body)
-        else:
-            print("No SURBs available for nym [%s]" % nym)
+#     def send_to_nym(self, nym, message):
+#         p = self.params
+#         pki = self.pki
+#         db = self.database
+#         print("Nymserver received message for [%s]" % nym)
+#         if nym in db and len(db[nym]) > 0:
+#             n0, header0, ktilde = db[nym].pop(0)
+#             body = p.pi(ktilde, pad_body(p.m, (b"\x00" * p.k) + message))
+#             pki[n0].process(header0, body)
+#         else:
+#             print("No SURBs available for nym [%s]" % nym)

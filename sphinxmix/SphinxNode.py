@@ -131,59 +131,59 @@ def sphinx_process(params, secret, header, delta):
     return ret
 
 
-class SphinxTestNode:
-    """ A Sphinx Test Node class."""
+# class SphinxTestNode:
+#     """ A Sphinx Test Node class."""
 
-    def __init__(self, params, pki, secret=None):
-        self.p = params
-        group = self.p.group
+#     def __init__(self, params, pki, secret=None):
+#         self.p = params
+#         group = self.p.group
 
-        # Load the user provided secret for the Node
-        if secret == None:
-            self._x = group.gensecret()
-        else:
-            self._x = secret
+#         # Load the user provided secret for the Node
+#         if secret == None:
+#             self._x = group.gensecret()
+#         else:
+#             self._x = secret
 
-        # Generate public key
-        self.y = group.expon(group.g, self._x)
-        idnum = urandom(4)
+#         # Generate public key
+#         self.y = group.expon(group.g, self._x)
+#         idnum = urandom(4)
         
 
-        self.id = Nenc(self.p, idnum)
-        self.name = b"Node " + idnum # .encode("hex")
+#         self.id = Nenc(self.p, idnum)
+#         self.name = b"Node " + idnum # .encode("hex")
         
-        # The list of seen packets
-        self.seen = {}
+#         # The list of seen packets
+#         self.seen = {}
 
-        # A local mapping between IDs and Nodes
-        self.pki = pki
+#         # A local mapping between IDs and Nodes
+#         self.pki = pki
 
-    def process(self, header, delta):
+#     def process(self, header, delta):
 
-        RET = sphinx_process(self.p, self._x, header, delta)
-        (tag, (typex, valx, rest), (header, delta)) = RET
+#         RET = sphinx_process(self.p, self._x, header, delta)
+#         (tag, (typex, valx, rest), (header, delta)) = RET
         
-        print("Processing at", self.name)
+#         print("Processing at", self.name)
 
-        p = self.p
-        pki = self.pki
+#         p = self.p
+#         pki = self.pki
 
-        if typex == "node":
-            return pki[valx].process(header, delta)
+#         if typex == "node":
+#             return pki[valx].process(header, delta)
 
-        if typex == "Dspec":
-            if delta[:p.k] == (b"\x00" * p.k):
-                  type2, val, rest = PFdecode(self.p, delta[self.p.k:])
-                  if type2 == "dest":
-                      body = unpad_body(rest)
+#         if typex == "Dspec":
+#             if delta[:p.k] == (b"\x00" * p.k):
+#                   type2, val, rest = PFdecode(self.p, delta[self.p.k:])
+#                   if type2 == "dest":
+#                       body = unpad_body(rest)
 
-            print("Deliver [%s] to [%s]" % (body, val))
-            return (val, body)
+#             print("Deliver [%s] to [%s]" % (body, val))
+#             return (val, body)
 
-        if typex == "dest":
-            idc = rest[:self.p.k]
-            if valx in pki:
-                return pki[valx].process(idc, delta)
-            else:
-                print("No such client [%s]" % val)
-                return
+#         if typex == "dest":
+#             idc = rest[:self.p.k]
+#             if valx in pki:
+#                 return pki[valx].process(idc, delta)
+#             else:
+#                 print("No such client [%s]" % val)
+#                 return
