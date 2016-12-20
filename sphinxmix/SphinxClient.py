@@ -48,7 +48,7 @@ def rand_subset(lst, nu):
     return list(map(lambda x:x[1], nodeids[:nu]))
 
 
-def create_header(params, nodelist, pki, dest, mid):
+def create_header(params, nodelist, keys, dest, mid):
     """ Internal function, creating a Sphinx header, given parameters, a node list (path), 
     a pki mapping node names to keys, a destination, and a message identifier.""" 
 
@@ -72,9 +72,9 @@ def create_header(params, nodelist, pki, dest, mid):
     blind_factor = x
     asbtuples = []
     
-    for node in nodelist:
+    for k in keys:
         alpha = group.expon(group.g, blind_factor)
-        s = group.expon(pki[node].y, blind_factor)
+        s = group.expon(keys, blind_factor)
         b = p.hb(alpha, s)
         blind_factor = blind_factor.mod_mul(b, p.group.G.order())
         
@@ -134,7 +134,7 @@ def create_header(params, nodelist, pki, dest, mid):
         [x.s for x in asbtuples]
 
 
-def create_forward_message(params, nodelist, pki, dest, msg):
+def create_forward_message(params, nodelist, keys, dest, msg):
     """Creates a forward Sphix message, ready to be processed by a first mix. 
 
     It takes as parameters a node list of mix ids, forming the path of the message;
@@ -158,7 +158,7 @@ def create_forward_message(params, nodelist, pki, dest, msg):
 
     return header, delta
 
-def create_surb(params, nodelist, pki, dest):
+def create_surb(params, nodelist, keys, dest):
     """Creates a Sphinx single use reply block (SURB) using a set of parameters;
     a sequence of mix identifiers; a pki mapping names of mixes to keys; and a final 
     destination.
@@ -175,7 +175,7 @@ def create_surb(params, nodelist, pki, dest):
     id = urandom(p.k)
 
     # Compute the header and the secrets
-    header, secrets = create_header(params, nodelist, pki, Denc(dest), id)
+    header, secrets = create_header(params, nodelist, keys, Denc(dest), id)
 
     ktilde = urandom(p.k)
     keytuple = [ktilde]
@@ -233,13 +233,13 @@ def test_timing():
 
     # The simplest path selection algorithm and message packaging
     use_nodes = rand_subset(pkiPub.keys(), r)
-
+    node_keys = [n.y for n in pkiPub[use_nodes]]
     print()
     
     import time
     t0 = time.time()
     for _ in range(100):
-        header, delta = create_forward_message(params, use_nodes, pkiPub, b"dest", b"this is a test")
+        header, delta = create_forward_message(params, use_nodes, node_keys, b"dest", b"this is a test")
     t1 = time.time()
     print("Time per mix encoding: %.2fms" % ((t1-t0)*1000.0/100))
 
@@ -274,9 +274,10 @@ def test_minimal():
 
     # The simplest path selection algorithm and message packaging
     use_nodes = rand_subset(pkiPub.keys(), r)
+    node_keys = [n.y for n in pkiPub[use_nodes]]
     dest = b"bob"
     message = b"this is a test"
-    header, delta = create_forward_message(params, use_nodes, pkiPub, dest, message)
+    header, delta = create_forward_message(params, use_nodes, keys, dest, message)
 
     # Process message by the sequence of mixes
     from .SphinxNode import sphinx_process
@@ -305,7 +306,7 @@ def test_minimal():
             break
 
     # Test the nym creation
-    surbid, surbkeytuple, nymtuple = create_surb(params, use_nodes, pkiPub, b"myself")
+    surbid, surbkeytuple, nymtuple = create_surb(params, use_nodes, keys, b"myself")
     
     message = b"This is a reply"
     header, delta = package_surb(params, nymtuple, message)
