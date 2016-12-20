@@ -40,38 +40,32 @@ class Group_ECC:
 
     def __init__(self, gid=713):
         self.G = EcGroup(gid)
-        self.g = self.G.generator() # .export()
+        self.g = self.G.generator()
 
     def gensecret(self):
-        return self.G.order().random() # .binary()
+        return self.G.order().random()
 
-    def expon(self, base, exp):
-        # x = Bn.from_binary(exp)
-        # b = EcPt.from_binary(base, self.G)
-        
+    def expon(self, base, exp):        
         x = exp
         b = base
-        return (x * b) # .export()
+        return (x * b)
 
     def multiexpon(self, base, exps):
-        # base = EcPt.from_binary(base, self.G)
         expon = 1
         for e in exps:
-            # expon = Bn.from_binary(e).mod_mul( expon, self.G.order())
             expon = e.mod_mul( expon, self.G.order())
-        return (expon * base) # .export()
+        return (expon * base)
 
     def makeexp(self, data):
-        return (Bn.from_binary(data) % self.G.order()) # .binary()
-        #return data % self.G.order()
+        return (Bn.from_binary(data) % self.G.order())
 
     def in_group(self, alpha):
         # All strings of length 32 are in the group, says DJB
-        b = alpha # EcPt.from_binary(alpha, self.G)
+        b = alpha
         return self.G.check_point(b)
 
     def printable(self, alpha):
-        return alpha.export(POINT_CONVERSION_UNCOMPRESSED) # .encode("hex")
+        return alpha.export(POINT_CONVERSION_UNCOMPRESSED)
 
 def test_group():
     G = Group_ECC()
@@ -107,9 +101,6 @@ def test_params():
 class SphinxParams:
     k = 16 # in bytes, == 128 bits
     m = 1024 # size of message body, in bytes
-
-    # pki = {} # mapping of node id to node
-    # clients = {} # mapping of destinations to clients
 
     def __init__(self, r=5, group=None):
         self.r = r
