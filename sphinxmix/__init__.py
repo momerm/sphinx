@@ -57,11 +57,12 @@ by the sequence of mixes.
     >>> x = pkiPriv[use_nodes[0]].x
     >>> while True:
     ...     seen = {}
-    ...     ret = sphinx_process(params, x, seen, header, delta)
-    ...     if ret[0] == "Node":
-    ...         _, (addr, header, delta) = ret
+    ...     ret = sphinx_process(params, x, header, delta)
+    ...     (tag, (typex, valx, rest), (header, delta)) = ret
+    ...     if typex == "node":
+    ...         addr = valx
     ...         x = pkiPriv[addr].x 
-    ...     elif ret[0] == "Process":
+    ...     elif typex == "Dspec":
     ...         break
     
 """

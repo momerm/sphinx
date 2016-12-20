@@ -130,21 +130,6 @@ def sphinx_process(params, secret, header, delta):
     ret = (tag, (typex, valx, rest), ((alpha, beta, gamma), delta))
     return ret
 
-    # if typex == "node":
-    #     return ("Node", (val, (alpha, beta, gamma), delta))
-
-    # if typex == "Dspec":
-    #     if delta[:p.k] == (b"\x00" * p.k):
-    #         type2, val, rest = PFdecode(params, delta[p.k:])
-    #         if type2 == "dest":
-    #             body = unpad_body(rest)
-    #             return ("Process", ((type2, val), body) )
-
-    # if typex == "dest":
-    #     idx = rest[:p.k]
-    #     return ("Client", ((val, idx), delta))
-
-
 
 class SphinxTestNode:
     """ A Sphinx Test Node class."""
@@ -171,32 +156,48 @@ class SphinxTestNode:
         self.seen = {}
 
         # A local mapping between IDs and Nodes
-        # params.pki[self.id] = self
         self.pki = pki
 
     def process(self, header, delta):
 
-        RET = sphinx_process(self.p, self._x, {}, header, delta)
+        # if typex == "node":
+        #     return ("Node", (val, (alpha, beta, gamma), delta))
 
+        # if typex == "Dspec":
+        #     if delta[:p.k] == (b"\x00" * p.k):
+        #         type2, val, rest = PFdecode(params, delta[p.k:])
+        #         if type2 == "dest":
+        #             body = unpad_body(rest)
+        #             return ("Process", ((type2, val), body) )
+
+        # if typex == "dest":
+        #     idx = rest[:p.k]
+        #     return ("Client", ((val, idx), delta))
+
+        RET = sphinx_process(self.p, self._x, header, delta)
+        (tag, (typex, valx, rest), (header, delta)) = RET
+        
         print("Processing at", self.name)
 
         p = self.p
         pki = self.pki
 
-        type_code = RET[0]
-        if type_code == "Node":
-            (_, (val, (alpha, beta, gamma), delta)) = RET
-            return pki[val].process((alpha, beta, gamma), delta)
+        if typex == "node":
+            return pki[valx].process(header, delta)
 
-        if type_code == "Process":
-            (_, ((type2, val), body) ) = RET
+        if typex == "Dspec":
+            if delta[:p.k] == (b"\x00" * p.k):
+                  type2, val, rest = PFdecode(self.p, delta[self.p.k:])
+                  if type2 == "dest":
+                      body = unpad_body(rest)
+
             print("Deliver [%s] to [%s]" % (body, val))
-            return 
+            return (body, val)
 
-        if type_code == "Client":
-            (_, ((val,idc), delta)) = RET            
-            if val in pki:
-                return pki[val].process(idc, delta)
+        if typex == "dest":
+            idc = rest[:self.p.k]
+            if valx in pki:
+                return pki[valx].process(idc, delta)
             else:
                 print("No such client [%s]" % val)
                 return

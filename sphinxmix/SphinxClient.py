@@ -308,7 +308,7 @@ def test_timing():
     t0 = time.time()
     for _ in range(100):
         x = pki[use_nodes[0]]._x
-        sphinx_process(params, x, {}, header, delta)
+        sphinx_process(params, x, header, delta)
         # header, delta = create_forward_message(params, use_nodes, "dest", "this is a test")
     t1 = time.time()
     print("Time per mix processing: %.2fms" % ((t1-t0)*1000.0/100))
