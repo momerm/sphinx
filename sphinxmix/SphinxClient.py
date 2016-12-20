@@ -51,13 +51,15 @@ def rand_subset(lst, nu):
 def create_header(params, nodelist, pki, dest, mid):
     """ Internal function, creating a Sphinx header, given parameters, a node list (path), 
     a pki mapping node names to keys, a destination, and a message identifier.""" 
-    node_meta = [pack("b", len(n)) + n for n in nodelist]
+
+    # node_meta = [pack("b", len(n)) + n for n in nodelist]
     node_meta = [ n for n in nodelist]
 
     p = params
     nu = len(nodelist)
-
     max_len = p.max_len
+
+    # print("Len: %s %s" % (len(dest), len(mid)))
 
     assert nu <= p.r
     assert len(mid) == p.k
@@ -88,14 +90,11 @@ def create_header(params, nodelist, pki, dest, mid):
 
 
         plain = phi + (b"\x00" * (p.k + len(node_meta[i])))
-        # min_len2 = (max_len - 32) - len(plain)
-        # assert min_len2 == min_len
-
         blind = p.rho(p.hrho(asbtuples[i-1].s))[min_len:]
         assert len(plain) == len(blind)
 
         phi = p.xor(plain, blind)
-        print("Phi(%d): %s" % (i, hexlify(phi)))
+        # print("Phi(%d): %s" % (i, hexlify(phi)))
     
     # Compute the (beta, gamma) tuples
     # The os.urandom used to be a string of 0x00 bytes, but that's wrong
@@ -356,6 +355,7 @@ def test_minimal():
 
         ret = sphinx_process(params, x, seen, header, delta)
         print("round %d" % i)
+        i += 1
 
         if ret[0] == "Node":
             _, (addr, header, delta) = ret
