@@ -344,17 +344,20 @@ def test_minimal():
 
     i = 0
     while True:
-        seen = {}
 
-        ret = sphinx_process(params, x, seen, header, delta)
+        ret = sphinx_process(params, x, header, delta)
+        (tag, (typex, valx, rest), (header, delta)) = ret
+
+
         print("round %d" % i)
         i += 1
 
-        if ret[0] == "Node":
-            _, (addr, header, delta) = ret
+        print("Type: %s" % typex)
+        if typex == "node":
+            addr = valx
             x = pkiPriv[addr].x 
-        elif ret[0] == "Process":
-            print(ret[1])
+        elif typex == "Dspec":
+            print(valx)
             break
         else:
             print("Error")
@@ -370,13 +373,15 @@ def test_minimal():
     x = pkiPriv[use_nodes[0]].x
 
     while True:
-        seen = {}
-        ret = sphinx_process(params, x, seen, header, delta)
-        if ret[0] == "Node":
-            _, (addr, header, delta) = ret
+        ret = sphinx_process(params, x, header, delta)
+        (tag, (typex, valx, rest), (header, delta)) = ret
+
+        if typex == "node":
+            addr = valx
             x = pkiPriv[addr].x 
-        elif ret[0] == "Client":
-            (myname, myid), delta = ret[1]
+        elif typex == "dest":
+            idx = rest[:params.k]
+            (myname, myid), delta = (valx, idx), delta
             break
 
     received = receive_surb(params, surbkeytuple, delta)

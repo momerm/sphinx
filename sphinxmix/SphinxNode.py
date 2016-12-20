@@ -65,66 +65,6 @@ def Denc(dest):
 def test_Denc():
     assert Denc(bytes(b'dest')) == b'\x04dest'
 
-class SphinxException(Exception):
-    pass
-
-# Core Process function -- devoid of any chrome
-def sphinx_process(params, secret, seen, header, delta):
-    """ The heart of a Sphinx server, that processes incoming messages.
-    It takes a set of parameters, the secret of the server, the dictionary of seen messages,
-    and an incoming message header and body.
-    It may return 3 structures:
-        - ("Node", (nextmix, header, delta)): The message needs to be forwarded to the next mix.
-        - ("Process", ((type, receiver), body)): The message should be sent to the final receiver.
-        - ("Client", ((receiver, surbid), delta)): The SURB reply needs to be send to the receiver with a surbid index.
-     """
-    p = params
-    group = p.group
-    alpha, beta, gamma = header
-
-    # Check that alpha is in the group
-    if not group.in_group(alpha):
-        raise SphinxException("Alpha not in Group.")
-
-    # Compute the shared secret
-    s = group.expon(alpha, secret)
-
-    # Have we seen it already?
-    tag = p.htau(s)
-
-    if tag in seen:
-        raise SphinxException("Message already processed.")
-
-    if gamma != p.mu(p.hmu(s), beta):
-        raise SphinxException("MAC mismatch.")
-
-    seen[tag] = 1
-
-    B = p.xor(beta + (b"\x00" * (2 * p.k)), p.rho(p.hrho(s)))
-
-    type, val, rest = PFdecode(params, B)
-    delta = p.pii(p.hpi(s), delta)
-
-    b = p.hb(alpha, s)
-    alpha = group.expon(alpha, b)
-    gamma = rest[:p.k]
-    beta = rest[p.k:]
-
-    if type == "node":
-        return ("Node", (val, (alpha, beta, gamma), delta))
-
-    if type == "Dspec":
-        if delta[:p.k] == (b"\x00" * p.k):
-            type2, val, rest = PFdecode(params, delta[p.k:])
-            if type2 == "dest":
-                body = unpad_body(rest)
-                return ("Process", ((type2, val), body) )
-
-    if type == "dest":
-        id = rest[:p.k]
-        return ("Client", ((val, id), delta))
-
-
 # Sphinx nodes
 def Nenc(param, idnum):
     """ The encoding of mix names. """
@@ -146,6 +86,64 @@ def PFdecode(param, s):
     print(s)
     assert False
     return None, None, None
+
+
+class SphinxException(Exception):
+    pass
+
+# Core Process function -- devoid of any chrome
+def sphinx_process(params, secret, header, delta):
+    """ The heart of a Sphinx server, that processes incoming messages.
+    It takes a set of parameters, the secret of the server, the dictionary of seen messages,
+    and an incoming message header and body.
+    It may return 3 structures:
+        - ("Node", (nextmix, header, delta)): The message needs to be forwarded to the next mix.
+        - ("Process", ((type, receiver), body)): The message should be sent to the final receiver.
+        - ("Client", ((receiver, surbid), delta)): The SURB reply needs to be send to the receiver with a surbid index.
+     """
+    p = params
+    group = p.group
+    alpha, beta, gamma = header
+
+    # Check that alpha is in the group
+    if not group.in_group(alpha):
+        raise SphinxException("Alpha not in Group.")
+
+    # Compute the shared secret
+    s = group.expon(alpha, secret)
+    
+    if gamma != p.mu(p.hmu(s), beta):
+        raise SphinxException("MAC mismatch.")
+
+    B = p.xor(beta + (b"\x00" * (2 * p.k)), p.rho(p.hrho(s)))
+
+    typex, valx, rest = PFdecode(params, B)
+
+    # Have we seen it already?
+    tag = p.htau(s)
+    b = p.hb(alpha, s)
+    alpha = group.expon(alpha, b)
+    gamma = rest[:p.k]
+    beta = rest[p.k:]
+    delta = p.pii(p.hpi(s), delta)
+
+    ret = (tag, (typex, valx, rest), ((alpha, beta, gamma), delta))
+    return ret
+
+    # if typex == "node":
+    #     return ("Node", (val, (alpha, beta, gamma), delta))
+
+    # if typex == "Dspec":
+    #     if delta[:p.k] == (b"\x00" * p.k):
+    #         type2, val, rest = PFdecode(params, delta[p.k:])
+    #         if type2 == "dest":
+    #             body = unpad_body(rest)
+    #             return ("Process", ((type2, val), body) )
+
+    # if typex == "dest":
+    #     idx = rest[:p.k]
+    #     return ("Client", ((val, idx), delta))
+
 
 
 class SphinxTestNode:
