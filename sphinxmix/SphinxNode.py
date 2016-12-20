@@ -20,6 +20,7 @@
 
 from os import urandom
 from struct import unpack
+from binascii import hexlify
 
 # Python 2/3 compatibility
 from builtins import bytes
@@ -70,18 +71,14 @@ class SphinxException(Exception):
 # Core Process function -- devoid of any chrome
 def sphinx_process(params, secret, seen, header, delta):
     """ The heart of a Sphinx server, that processes incoming messages.
-
     It takes a set of parameters, the secret of the server, the dictionary of seen messages,
     and an incoming message header and body.
-
     It may return 3 structures:
         - ("Node", (nextmix, header, delta)): The message needs to be forwarded to the next mix.
         - ("Process", ((type, receiver), body)): The message should be sent to the final receiver.
         - ("Client", ((receiver, surbid), delta)): The SURB reply needs to be send to the receiver with a surbid index.
      """
     p = params
-    max_len = p.max_len
-
     group = p.group
 
     alpha, beta, gamma = header
@@ -99,30 +96,20 @@ def sphinx_process(params, secret, seen, header, delta):
     if tag in seen:
         raise SphinxException("Message already processed.")
 
-    # assert len(beta) == max_len
     if gamma != p.mu(p.hmu(s), beta):
         raise SphinxException("MAC mismatch.")
 
     seen[tag] = 1
 
-    beta_pad = beta + (b"\x00" * max_len)
-    B = p.xor(beta_pad, p.rho(p.hrho(s), len(beta_pad)))
-    
-    routing_size = unpack("b",B[:1])[0]
-    routing_info = B[1:1+routing_size]
-    rest = B[1+routing_size:]
+    B = p.xor(beta + (b"\x00" * (2 * p.k)), p.rho(p.hrho(s)))
 
-    #B = p.xor(beta + (b"\x00" * (2 * p.k)), p.rho(p.hrho(s)))
-    #assert B[:1] == b"\x88"
-    #B = B[1:]
-
-    type, val, rest2 = PFdecode(params, routing_info)
+    type, val, rest = PFdecode(params, B)
 
     if type == "node":
         b = p.hb(alpha, s)
         alpha = group.expon(alpha, b)
-        gamma = rest[:p.k]
-        beta = rest[p.k:p.k + max_len]
+        gamma = B[p.k:p.k*2]
+        beta = B[p.k*2:]
         delta = p.pii(p.hpi(s), delta)
         return ("Node", (val, (alpha, beta, gamma), delta))
 
@@ -131,7 +118,7 @@ def sphinx_process(params, secret, seen, header, delta):
         if delta[:p.k] == (b"\x00" * p.k):
             type2, val, rest = PFdecode(params, delta[p.k:])
             if type2 == "dest":
-                body = unpad_body(rest2)
+                body = unpad_body(rest)
                 return ("Process", ((type2, val), body) )
 
     if type == "dest":

@@ -22,6 +22,7 @@
 from os import urandom
 from collections import namedtuple
 from struct import pack
+from binascii import hexlify
 
 # Python 2/3 compatibility
 from builtins import bytes
@@ -51,6 +52,7 @@ def create_header(params, nodelist, pki, dest, mid):
     """ Internal function, creating a Sphinx header, given parameters, a node list (path), 
     a pki mapping node names to keys, a destination, and a message identifier.""" 
     node_meta = [pack("b", len(n)) + n for n in nodelist]
+    node_meta = [ n for n in nodelist]
 
     p = params
     nu = len(nodelist)
@@ -82,7 +84,7 @@ def create_header(params, nodelist, pki, dest, mid):
     for i in range(1,nu):
         # min = (2*(p.r-i) + 3)*p.k
         len_meta = sum(map(len, node_meta[:i]))
-        min_len = max_len - i*p.k - len_meta
+        min_len = (max_len - 32)  - (i-2) * p.k - len_meta
 
         # Debug info
         # min_len2 = 2*(p.r-i)*p.k + 3*p.k
@@ -90,16 +92,20 @@ def create_header(params, nodelist, pki, dest, mid):
         # End
 
         plain = phi + (b"\x00" * (p.k + len(node_meta[i])))
+        min_len2 = (max_len - 32) - len(plain)
+        # assert min_len2 == min_len
+
         blind = p.rho(p.hrho(asbtuples[i-1].s))[min_len:]
         assert len(plain) == len(blind)
 
         phi = p.xor(plain, blind)
+        print("Phi(%d): %s" % (i, hexlify(phi)))
     
     # Compute the (beta, gamma) tuples
     # The os.urandom used to be a string of 0x00 bytes, but that's wrong
     
     len_meta = sum(map(len, node_meta))    
-    random_pad_len = max_len - len_meta - (nu + 1)*p.k - len(dest)
+    random_pad_len = (max_len - 32) - len_meta - (nu - 1)*p.k - len(dest)
     
     # Debug info
     # random_pad_len2 = ((2 * (p.r - nu) + 2)*p.k - len(dest))
@@ -113,7 +119,7 @@ def create_header(params, nodelist, pki, dest, mid):
     # assert len(beta) == len_beta
     # End
 
-    blind = p.rho(p.hrho(asbtuples[nu-1].s))[:len(beta)]
+    blind = p.rho(p.hrho(asbtuples[nu-1].s), len(beta)) # [:len(beta)]
     assert len(beta) == len(blind)
 
     beta = p.xor(beta, blind) + phi
@@ -123,8 +129,7 @@ def create_header(params, nodelist, pki, dest, mid):
         node_id = node_meta[i+1]
         # assert len(node_id) == p.k
 
-        
-        plain_beta_len = max_len - 3*p.k - len(node_id)
+        plain_beta_len = (max_len - 32) - p.k - len(node_id)
         
         # Debug info
         # plain_beta_len2 = (2*p.r-1)*p.k
@@ -135,12 +140,16 @@ def create_header(params, nodelist, pki, dest, mid):
         plain_len = plain_beta_len + len(node_id) + p.k
 
         plain = node_id + gamma + beta[:plain_beta_len]
-        blind = p.rho(p.hrho(asbtuples[i].s))[:plain_len]
+        blind = p.rho(p.hrho(asbtuples[i].s), len(plain))
         assert len(plain) == len(blind)
 
         beta = p.xor(plain, blind)
+        print("Beta %d: \n%s" % (i, hexlify(beta)))
         gamma = p.mu(p.hmu(asbtuples[i].s), beta)
-    
+
+        print("Actual beta len: %d" % len(beta))
+
+    assert len(beta) == max_len - 32
     return (asbtuples[0].alpha, beta, gamma), \
         [x.s for x in asbtuples]
 
@@ -363,9 +372,13 @@ def test_minimal():
     from .SphinxNode import sphinx_process
     x = pkiPriv[use_nodes[0]].x
 
+    i = 0
     while True:
         seen = {}
+
         ret = sphinx_process(params, x, seen, header, delta)
+        print("round %d" % i)
+
         if ret[0] == "Node":
             _, (addr, header, delta) = ret
             x = pkiPriv[addr].x 
