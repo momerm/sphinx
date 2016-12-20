@@ -52,6 +52,10 @@ first mix. Note both destination and message need to be ``bytes``.
     >>> header, delta = create_forward_message(params, nodes_routing, \\
     ...     keys_nodes, dest, message)
 
+The client may specify any information in the ``nodes_routing`` list, that will
+be passed to intermediate mixes. At a minimum this should include information about 
+the next mix.
+
 Processing Sphinx messages at a mix
 -----------------------------------
 
@@ -65,15 +69,19 @@ by the sequence of mixes.
     >>> x = pkiPriv[use_nodes[0]].x
     >>> while True:
     ...     ret = sphinx_process(params, x, header, delta)
-    ...     (tag, B, (header, delta)) = ret
-    ...     routing = PFdecode(params, B)
+    ...     (tag, info, (header, delta)) = ret
+    ...     routing = PFdecode(params, info)
     ...     if routing[0] == Relay_flag:
     ...         flag, addr = routing
     ...         x = pkiPriv[addr].x 
     ...     elif routing[0] == Dest_flag:
     ...         assert receive_forward(params, delta) == [dest, message]
     ...         break
-    
+
+It is the responsibility of a mix to record ``tags`` of messages to prevent 
+replay attacks. The ``PFdecode`` function may be used to recover routing Information
+including the next mix, or any other user specified information.
+
 Single use reply Blocks
 -----------------------
 
