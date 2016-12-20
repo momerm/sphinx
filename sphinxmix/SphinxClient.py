@@ -86,13 +86,9 @@ def create_header(params, nodelist, pki, dest, mid):
         len_meta = sum(map(len, node_meta[:i]))
         min_len = (max_len - 32)  - (i-2) * p.k - len_meta
 
-        # Debug info
-        # min_len2 = 2*(p.r-i)*p.k + 3*p.k
-        # assert min_len == min_len2
-        # End
 
         plain = phi + (b"\x00" * (p.k + len(node_meta[i])))
-        min_len2 = (max_len - 32) - len(plain)
+        # min_len2 = (max_len - 32) - len(plain)
         # assert min_len2 == min_len
 
         blind = p.rho(p.hrho(asbtuples[i-1].s))[min_len:]
@@ -107,18 +103,7 @@ def create_header(params, nodelist, pki, dest, mid):
     len_meta = sum(map(len, node_meta))    
     random_pad_len = (max_len - 32) - len_meta - (nu - 1)*p.k - len(dest)
     
-    # Debug info
-    # random_pad_len2 = ((2 * (p.r - nu) + 2)*p.k - len(dest))
-    # assert random_pad_len == random_pad_len2
-    # End
-
     beta = dest + mid + urandom(random_pad_len)
-
-    # Debug info
-    # len_beta = (2*(p.r-nu)+3)*p.k
-    # assert len(beta) == len_beta
-    # End
-
     blind = p.rho(p.hrho(asbtuples[nu-1].s), len(beta)) # [:len(beta)]
     assert len(beta) == len(blind)
 
@@ -130,13 +115,6 @@ def create_header(params, nodelist, pki, dest, mid):
         # assert len(node_id) == p.k
 
         plain_beta_len = (max_len - 32) - p.k - len(node_id)
-        
-        # Debug info
-        # plain_beta_len2 = (2*p.r-1)*p.k
-        # assert plain_beta_len == plain_beta_len2
-        # assert plain_beta_len + len(node_id) + p.k == (2*p.r+1)*p.k
-        # End
-
         plain_len = plain_beta_len + len(node_id) + p.k
 
         plain = node_id + gamma + beta[:plain_beta_len]
