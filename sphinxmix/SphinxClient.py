@@ -85,8 +85,8 @@ def create_header(params, nodelist, pki, dest, mid):
     phi = b''
     for i in range(1,nu):
 
-        meta_len = sum(map(len, node_meta[:i+1]))
-        min_len = (max_len - 32)  - i * p.k - meta_len
+        meta_len = sum(map(len, node_meta[:i-1]))
+        min_len = (max_len - 32)  - (i-1) * p.k - meta_len
         plain = phi + (b"\x00" * (p.k + len(node_meta[i])))
         blind = p.rho(p.hrho(asbtuples[i-1].s))[min_len:]
         

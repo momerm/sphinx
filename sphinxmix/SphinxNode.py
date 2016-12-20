@@ -80,7 +80,6 @@ def sphinx_process(params, secret, seen, header, delta):
      """
     p = params
     group = p.group
-
     alpha, beta, gamma = header
 
     # Check that alpha is in the group
@@ -104,17 +103,16 @@ def sphinx_process(params, secret, seen, header, delta):
     B = p.xor(beta + (b"\x00" * (2 * p.k)), p.rho(p.hrho(s)))
 
     type, val, rest = PFdecode(params, B)
+    delta = p.pii(p.hpi(s), delta)
 
     if type == "node":
         b = p.hb(alpha, s)
         alpha = group.expon(alpha, b)
-        gamma = B[p.k:p.k*2]
-        beta = B[p.k*2:]
-        delta = p.pii(p.hpi(s), delta)
+        gamma = rest[:p.k]
+        beta = rest[p.k:]
         return ("Node", (val, (alpha, beta, gamma), delta))
 
     if type == "Dspec":
-        delta = p.pii(p.hpi(s), delta)
         if delta[:p.k] == (b"\x00" * p.k):
             type2, val, rest = PFdecode(params, delta[p.k:])
             if type2 == "dest":
@@ -123,7 +121,6 @@ def sphinx_process(params, secret, seen, header, delta):
 
     if type == "dest":
         id = rest[:p.k]
-        delta = p.pii(p.hpi(s), delta)
         return ("Client", ((val, id), delta))
 
 
