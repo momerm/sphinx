@@ -25,8 +25,7 @@ from binascii import hexlify
 # Python 2/3 compatibility
 from builtins import bytes
 
-class SphinxException(Exception):
-    pass
+from . import SphinxException
 
 # Core Process function -- devoid of any chrome
 def sphinx_process(params, secret, header, delta):
@@ -58,6 +57,7 @@ def sphinx_process(params, secret, header, delta):
     B = p.xor(beta_pad, p.rho(p.hrho(s), len(beta_pad)))
 
     length = B[0]
+    routing = B[1:1+length]
     rest = B[1+length:]
 
     tag = p.htau(s)
@@ -67,6 +67,6 @@ def sphinx_process(params, secret, header, delta):
     beta = rest[p.k:p.k+(p.max_len - 32)]
     delta = p.pii(p.hpi(s), delta)
 
-    ret = (tag, B, ((alpha, beta, gamma), delta))
+    ret = (tag, routing, ((alpha, beta, gamma), delta))
     return ret
 

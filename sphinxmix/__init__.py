@@ -27,7 +27,7 @@ keys (derived using ``expon``).
     >>> pkiPriv = {}
     >>> pkiPub = {}
     >>> for i in range(10):
-    ...     nid = Nenc(params, bytes([i]))
+    ...     nid = i
     ...     x = params.group.gensecret()
     ...     y = params.group.expon(params.group.g, x)
     ...     pkiPriv[nid] = pki_entry(nid, x, y)
@@ -42,10 +42,11 @@ first mix. Note both destination and message need to be ``bytes``.
     >>> from sphinxmix.SphinxClient import rand_subset, \\
     ...                                    create_forward_message
     >>> use_nodes = rand_subset(pkiPub.keys(), 5)
+    >>> nodes_routing = list(map(Nenc, use_nodes))
     >>> keys_nodes = [pkiPub[n].y for n in use_nodes]
     >>> dest = b"bob"
     >>> message = b"this is a test"
-    >>> header, delta = create_forward_message(params, use_nodes, \\
+    >>> header, delta = create_forward_message(params, nodes_routing, \\
     ...     keys_nodes, dest, message)
 
 The heart of a Sphinx mix server is the ``sphinx_process`` function, that takes the server
@@ -53,20 +54,23 @@ secret and decodes incoming messages. In this example the message encode above, 
 by the sequence of mixes.
 
     >>> # Process message by the sequence of mixes
-    >>> from sphinxmix.SphinxClient import PFdecode
+    >>> from sphinxmix.SphinxClient import PFdecode, Relay_flag, Dest_flag, receive_forward
     >>> from sphinxmix.SphinxNode import sphinx_process
     >>> x = pkiPriv[use_nodes[0]].x
     >>> while True:
-    ...     seen = {}
     ...     ret = sphinx_process(params, x, header, delta)
     ...     (tag, B, (header, delta)) = ret
-    ...     typex, valx, rest = PFdecode(params, B)
-    ...     if typex == "node":
-    ...         addr = valx
+    ...     routing = PFdecode(params, B)
+    ...     if routing[0] == Relay_flag:
+    ...         flag, addr = routing
     ...         x = pkiPriv[addr].x 
-    ...     elif typex == "Dspec":
+    ...     elif routing[0] == Dest_flag:
+    ...         assert receive_forward(params, delta) == [dest, message]
     ...         break
     
 """
 
 VERSION = "0.0.2"
+
+class SphinxException(Exception):
+    pass

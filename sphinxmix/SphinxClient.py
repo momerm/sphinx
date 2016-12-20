@@ -23,13 +23,14 @@ from os import urandom
 from collections import namedtuple
 from struct import pack
 from binascii import hexlify
+from petlib.pack import encode, decode
 
 # Python 2/3 compatibility
 from builtins import bytes
 
 from .SphinxParams import SphinxParams
-# from .SphinxNode import  Denc, Dspec, pad_body, unpad_body, PFdecode
-# from .SphinxNymserver import Nymserver
+from . import SphinxException
+
 
 # FLAGS
 Relay_flag = "\xF0"
@@ -63,43 +64,20 @@ def unpad_body(body):
 
 # Prefix-free encoding/decoding of node names and destinations
 
-# The special destination
-Dspec = b"\x00"
-
-# Any other destination.  Must be between 1 and 127 bytes in length
-def Denc(dest):
-    dest = bytes(dest)
-    assert type(dest) is bytes
-    assert len(dest) >= 1 and len(dest) <= 127
-    return bytes([ len(dest) ]) + dest
-
-def test_Denc():
-    assert Denc(bytes(b'dest')) == b'\x04dest'
-
 # Sphinx nodes
-def Nenc(param, idnum):
+def Nenc(idnum):
     """ The encoding of mix names. """
-    id = b"\xff" + idnum + (b"\x00" * (param.k - len(idnum) - 1))
-    assert len(id) == param.k
-    return id
+    return Route_pack((Relay_flag, idnum))
+
+def Route_pack(info):
+    return encode(info)
 
 # Decode the prefix-free encoding.  Return the type, value, and the
 # remainder of the input string
-def PFdecode(param, s):
-    # print("Len: %s" % s[0])
-    s = s[1:]
-
+def PFdecode(param, packed):
     """ Decoder of prefix free encoder for commands."""
-    assert type(s) is bytes
-    if s == b"": return None, None, None
-    if s[:1] == b'\x00': return 'Dspec', None, s[1:]
-    if s[:1] == b'\xff': return 'node', s[:param.k], s[param.k:]
-    l = s[0]
-    if l < 128: return 'dest', s[1:l+1], s[l+1:]
-    
-    print(s)
-    assert False
-    return None, None, None
+    assert type(packed) is bytes
+    return decode(packed)
 
 
 header_record = namedtuple("header_record", ["alpha", "s", "b"])
@@ -118,27 +96,23 @@ def rand_subset(lst, nu):
     return list(map(lambda x:x[1], nodeids[:nu]))
 
 
-def create_header(params, nodelist, keys, dest, mid):
+def create_header(params, nodelist, keys, dest):
     """ Internal function, creating a Sphinx header, given parameters, a node list (path), 
     a pki mapping node names to keys, a destination, and a message identifier.""" 
 
     node_meta = [pack("b", len(n)) + n for n in nodelist]
-    # node_meta = [ n for n in nodelist]
 
     p = params
     nu = len(nodelist)
     max_len = p.max_len
 
-    # print("Len: %s %s" % (len(dest), len(mid)))
 
     assert nu <= p.r
-    assert len(mid) == p.k
     assert len(dest) <= 2 * (p.r - nu + 1) * p.k
     
     group = p.group
     x = group.gensecret()
 
-    # Compute the (alpha, s, b) tuples
     blind_factor = x
     asbtuples = []
     
@@ -155,8 +129,6 @@ def create_header(params, nodelist, keys, dest, mid):
     phi = b''
     min_len = (max_len - 32)
     for i in range(1,nu):
-        #min = (2*(p.r-i)+3)*p.k
-        
 
         plain = phi + (b"\x00" * (p.k + len(node_meta[i])))
 
@@ -165,7 +137,6 @@ def create_header(params, nodelist, keys, dest, mid):
 
         phi = p.xor(plain, blind)
 
-        #print("Min: %s = %s" % (min, min_len))
         min_len -= len(node_meta[i]) + p.k
         
     
@@ -174,7 +145,7 @@ def create_header(params, nodelist, keys, dest, mid):
     # Compute the (beta, gamma) tuples
     # The os.urandom used to be a string of 0x00 bytes, but that's wrong
     
-    final_routing = dest + mid
+    final_routing = dest
     final_routing = pack("b", len(final_routing)) + final_routing
 
     len_meta = sum(map(len, node_meta[1:]))
@@ -184,22 +155,17 @@ def create_header(params, nodelist, keys, dest, mid):
     blind = p.rho(p.hrho(asbtuples[nu-1].s), len(beta)) # [:len(beta)]
     
     beta = p.xor(beta, blind) + phi
-    assert len(beta) == (max_len - 32)
     gamma = p.mu(p.hmu(asbtuples[nu-1].s), beta)
     
     for i in range(nu-2, -1, -1):
         node_id = node_meta[i+1]
-        # assert len(node_id) == p.k
 
         plain_beta_len = (max_len - 32) - p.k - len(node_id)
         
         plain = node_id + gamma + beta[:plain_beta_len]
         blind = p.rho(p.hrho(asbtuples[i].s), len(plain))
-        assert len(plain) == len(blind)
 
         beta = p.xor(plain, blind)
-        # print("B(%d): \n%s" % (i,hexlify(beta)))
-        assert len(beta) == (max_len - 32)
         gamma = p.mu(p.hmu(asbtuples[i].s), beta)
 
         
@@ -220,10 +186,11 @@ def create_forward_message(params, nodelist, keys, dest, msg):
     assert p.k + 1 + len(dest) + len(msg) < p.m
 
     # Compute the header and the secrets
-    # dest = ()
-    header, secrets = create_header(params, nodelist, keys, Dspec, b"\x00" * p.k)
 
-    body = pad_body(p.m, (b"\x00" * p.k) + Denc(dest) + msg)
+    final = Route_pack((Dest_flag, ))
+    header, secrets = create_header(params, nodelist, keys, final)
+
+    body = pad_body(p.m, (b"\x00" * p.k) + encode((dest, msg)))
 
     # Compute the delta values
     delta = p.pi(p.hpi(secrets[nu-1]), body)
@@ -244,17 +211,17 @@ def create_surb(params, nodelist, keys, dest):
 
     """
     p = params
-    # pki = p.pki
     nu = len(nodelist)
-    id = urandom(p.k)
+    xid = urandom(p.k)
 
     # Compute the header and the secrets
-    header, secrets = create_header(params, nodelist, keys, Denc(dest), id)
+    final = Route_pack((Surb_flag, dest, xid))
+    header, secrets = create_header(params, nodelist, keys, final )
 
     ktilde = urandom(p.k)
     keytuple = [ktilde]
     keytuple.extend(map(p.hpi, secrets))
-    return id, keytuple, (nodelist[0], header, ktilde)
+    return xid, keytuple, (nodelist[0], header, ktilde)
 
 def package_surb(params, nymtuple, message):
     """Packages a message to be sent with a SURB. The message has to be bytes, 
@@ -265,6 +232,14 @@ def package_surb(params, nymtuple, message):
     n0, header0, ktilde = nymtuple
     body = params.pi(ktilde, pad_body(params.m, (b"\x00" * params.k) + message))
     return (header0, body)
+
+
+def receive_forward(params, delta):
+    if delta[:params.k] != b"\x00" * params.k:
+        raise SphinxException("Modified Body")
+
+    delta = unpad_body(delta[params.k:])
+    return decode(delta)
 
 def receive_surb(params, keytuple, delta): 
     """Processes a SURB body to extract the reply. The keytuple was provided at the time of 
@@ -290,16 +265,12 @@ def test_timing():
     r = 5
     params = SphinxParams(r)
     pki = {}
-    # nymserver = Nymserver(params, pki)
-
-    # The minimal PKI involves names of nodes and keys
-    # from .SphinxNode import Nenc
     
     pkiPriv = {}
     pkiPub = {}
 
     for i in range(2*r):
-        nid = Nenc(params, bytes([i]))
+        nid = pack("b", i)
         x = params.group.gensecret()
         y = params.group.expon(params.group.g, x)
         pkiPriv[nid] = pki_entry(nid, x, y)
@@ -307,13 +278,14 @@ def test_timing():
 
     # The simplest path selection algorithm and message packaging
     use_nodes = rand_subset(pkiPub.keys(), r)
+    nodes_routing = list(map(Nenc, use_nodes))
     node_keys = [pkiPub[n].y for n in use_nodes]
     print()
     
     import time
     t0 = time.time()
     for _ in range(100):
-        header, delta = create_forward_message(params, use_nodes, node_keys, b"dest", b"this is a test")
+        header, delta = create_forward_message(params, nodes_routing, node_keys, b"dest", b"this is a test")
     t1 = time.time()
     print("Time per mix encoding: %.2fms" % ((t1-t0)*1000.0/100))
 
@@ -323,7 +295,6 @@ def test_timing():
     for _ in range(100):
         x = pkiPriv[use_nodes[0]].x
         sphinx_process(params, x, header, delta)
-        # header, delta = create_forward_message(params, use_nodes, "dest", "this is a test")
     t1 = time.time()
     print("Time per mix processing: %.2fms" % ((t1-t0)*1000.0/100))
 
@@ -334,13 +305,12 @@ def test_minimal():
     params = SphinxParams(r)
 
     # The minimal PKI involves names of nodes and keys
-    # from .SphinxNode import Nenc
     
     pkiPriv = {}
     pkiPub = {}
 
     for i in range(2*r):
-        nid = Nenc(params, bytes([i]))
+        nid = pack("b", i) # Nenc(params, bytes([i]))
         x = params.group.gensecret()
         y = params.group.expon(params.group.g, x)
         pkiPriv[nid] = pki_entry(nid, x, y)
@@ -348,10 +318,11 @@ def test_minimal():
 
     # The simplest path selection algorithm and message packaging
     use_nodes = rand_subset(pkiPub.keys(), r)
+    nodes_routing = list(map(Nenc, use_nodes))
     node_keys = [pkiPub[n].y for n in use_nodes]
     dest = b"bob"
     message = b"this is a test"
-    header, delta = create_forward_message(params, use_nodes, node_keys, dest, message)
+    header, delta = create_forward_message(params, nodes_routing, node_keys, dest, message)
 
     # Process message by the sequence of mixes
     from .SphinxNode import sphinx_process
@@ -362,17 +333,22 @@ def test_minimal():
 
         ret = sphinx_process(params, x, header, delta)
         (tag, B, (header, delta)) = ret
-        typex, valx, rest = PFdecode(params, B)
+        routing = PFdecode(params, B)
 
         print("round %d" % i)
         i += 1
 
-        print("Type: %s" % typex)
-        if typex == "node":
-            addr = valx
+        # print("Type: %s" % typex)
+        if routing[0] == Relay_flag:
+            addr = routing[1]
             x = pkiPriv[addr].x 
-        elif typex == "Dspec":
-            assert rest[:16] == b"\x00" * 16
+        elif routing[0] == Dest_flag:
+            assert len(routing) == 1
+            assert delta[:16] == b"\x00" * params.k
+            dec_dest, dec_msg = receive_forward(params, delta)
+            assert dec_dest == dest
+            assert dec_msg == message
+
             break
         else:
             print("Error")
@@ -380,24 +356,25 @@ def test_minimal():
             break
 
     # Test the nym creation
-    surbid, surbkeytuple, nymtuple = create_surb(params, use_nodes, node_keys, b"myself")
+    surbid, surbkeytuple, nymtuple = create_surb(params, nodes_routing, node_keys, b"myself")
     
     message = b"This is a reply"
     header, delta = package_surb(params, nymtuple, message)
 
     x = pkiPriv[use_nodes[0]].x
 
+    i = 0 
     while True:
+        i += 1
         ret = sphinx_process(params, x, header, delta)
         (tag, B, (header, delta)) = ret
-        typex, valx, rest = PFdecode(params, B)
+        routing = PFdecode(params, B)
 
-        if typex == "node":
-            addr = valx
+        if routing[0] == Relay_flag:
+            flag, addr = routing
             x = pkiPriv[addr].x 
-        elif typex == "dest":
-            idx = rest[:params.k]
-            (myname, myid), delta = (valx, idx), delta
+        elif routing[0] == Surb_flag:
+            flag, myname, myid = routing
             break
 
     received = receive_surb(params, surbkeytuple, delta)
