@@ -43,10 +43,11 @@ first mix. Note both destination and message need to be ``bytes``.
     >>> from sphinxmix.SphinxClient import rand_subset, \\
     ...                                    create_forward_message
     >>> use_nodes = rand_subset(pkiPub.keys(), 5)
+    >>> keys_nodes = [pkiPub[n].y for n in use_nodes]
     >>> dest = b"bob"
     >>> message = b"this is a test"
     >>> header, delta = create_forward_message(params, use_nodes, \\
-    ...     pkiPub, dest, message)
+    ...     keys_nodes, dest, message)
 
 The heart of a Sphinx mix server is the ``sphinx_process`` function, that takes the server
 secret and decodes incoming messages. In this example the message encode above, is decoded

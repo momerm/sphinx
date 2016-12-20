@@ -75,7 +75,7 @@ def Nenc(param, idnum):
 # Decode the prefix-free encoding.  Return the type, value, and the
 # remainder of the input string
 def PFdecode(param, s):
-    print("Len: %s" % s[0])
+    # print("Len: %s" % s[0])
     s = s[1:]
 
     """ Decoder of prefix free encoder for commands."""
@@ -116,7 +116,7 @@ def sphinx_process(params, secret, header, delta):
     s = group.expon(alpha, secret)
     
     assert len(beta) == p.max_len - 32
-    print("B: \n%s" % hexlify(beta))
+    # print("B: \n%s" % hexlify(beta))
     if gamma != p.mu(p.hmu(s), beta):
         raise SphinxException("MAC mismatch.")
 

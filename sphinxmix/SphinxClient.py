@@ -74,7 +74,7 @@ def create_header(params, nodelist, keys, dest, mid):
     
     for k in keys:
         alpha = group.expon(group.g, blind_factor)
-        s = group.expon(keys, blind_factor)
+        s = group.expon(k, blind_factor)
         b = p.hb(alpha, s)
         blind_factor = blind_factor.mod_mul(b, p.group.G.order())
         
@@ -125,7 +125,7 @@ def create_header(params, nodelist, keys, dest, mid):
         assert len(plain) == len(blind)
 
         beta = p.xor(plain, blind)
-        print("B(%d): \n%s" % (i,hexlify(beta)))
+        # print("B(%d): \n%s" % (i,hexlify(beta)))
         assert len(beta) == (max_len - 32)
         gamma = p.mu(p.hmu(asbtuples[i].s), beta)
 
@@ -147,7 +147,7 @@ def create_forward_message(params, nodelist, keys, dest, msg):
     assert p.k + 1 + len(dest) + len(msg) < p.m
 
     # Compute the header and the secrets
-    header, secrets = create_header(params, nodelist, pki, Dspec, b"\x00" * p.k)
+    header, secrets = create_header(params, nodelist, keys, Dspec, b"\x00" * p.k)
 
     body = pad_body(p.m, (b"\x00" * p.k) + Denc(dest) + msg)
 
@@ -233,7 +233,7 @@ def test_timing():
 
     # The simplest path selection algorithm and message packaging
     use_nodes = rand_subset(pkiPub.keys(), r)
-    node_keys = [n.y for n in pkiPub[use_nodes]]
+    node_keys = [pkiPub[n].y for n in use_nodes]
     print()
     
     import time
@@ -274,10 +274,10 @@ def test_minimal():
 
     # The simplest path selection algorithm and message packaging
     use_nodes = rand_subset(pkiPub.keys(), r)
-    node_keys = [n.y for n in pkiPub[use_nodes]]
+    node_keys = [pkiPub[n].y for n in use_nodes]
     dest = b"bob"
     message = b"this is a test"
-    header, delta = create_forward_message(params, use_nodes, keys, dest, message)
+    header, delta = create_forward_message(params, use_nodes, node_keys, dest, message)
 
     # Process message by the sequence of mixes
     from .SphinxNode import sphinx_process
@@ -306,7 +306,7 @@ def test_minimal():
             break
 
     # Test the nym creation
-    surbid, surbkeytuple, nymtuple = create_surb(params, use_nodes, keys, b"myself")
+    surbid, surbkeytuple, nymtuple = create_surb(params, use_nodes, node_keys, b"myself")
     
     message = b"This is a reply"
     header, delta = package_surb(params, nymtuple, message)
