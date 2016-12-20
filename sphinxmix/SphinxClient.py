@@ -28,8 +28,78 @@ from binascii import hexlify
 from builtins import bytes
 
 from .SphinxParams import SphinxParams
-from .SphinxNode import  Denc, Dspec, pad_body, unpad_body
+# from .SphinxNode import  Denc, Dspec, pad_body, unpad_body, PFdecode
 # from .SphinxNymserver import Nymserver
+
+# FLAGS
+Relay_flag = "\xF0"
+Dest_flag = "\xF1"
+Surb_flag = "\xF2"
+
+# Padding/unpadding of message bodies: a 0 bit, followed by as many 1
+# bits as it takes to fill it up
+
+def pad_body(msgtotalsize, body):
+    """ Unpad the Sphinx message body."""
+    body = body + b"\x7f"
+    body = body + (b"\xff" * (msgtotalsize - len(body)))
+    return body
+
+def unpad_body(body):
+    """ Pad a Sphinx message body. """
+    body = bytes(body)
+    l = len(body) - 1
+    x_marker = bytes(b"\x7f")[0]
+    f_marker = bytes(b"\xff")[0]
+    while body[l] == f_marker and l > 0:
+        l -= 1
+    
+    if body[l] == x_marker:
+        ret = body[:l]
+    else:
+        ret = b''
+    
+    return ret
+
+# Prefix-free encoding/decoding of node names and destinations
+
+# The special destination
+Dspec = b"\x00"
+
+# Any other destination.  Must be between 1 and 127 bytes in length
+def Denc(dest):
+    dest = bytes(dest)
+    assert type(dest) is bytes
+    assert len(dest) >= 1 and len(dest) <= 127
+    return bytes([ len(dest) ]) + dest
+
+def test_Denc():
+    assert Denc(bytes(b'dest')) == b'\x04dest'
+
+# Sphinx nodes
+def Nenc(param, idnum):
+    """ The encoding of mix names. """
+    id = b"\xff" + idnum + (b"\x00" * (param.k - len(idnum) - 1))
+    assert len(id) == param.k
+    return id
+
+# Decode the prefix-free encoding.  Return the type, value, and the
+# remainder of the input string
+def PFdecode(param, s):
+    # print("Len: %s" % s[0])
+    s = s[1:]
+
+    """ Decoder of prefix free encoder for commands."""
+    assert type(s) is bytes
+    if s == b"": return None, None, None
+    if s[:1] == b'\x00': return 'Dspec', None, s[1:]
+    if s[:1] == b'\xff': return 'node', s[:param.k], s[param.k:]
+    l = s[0]
+    if l < 128: return 'dest', s[1:l+1], s[l+1:]
+    
+    print(s)
+    assert False
+    return None, None, None
 
 
 header_record = namedtuple("header_record", ["alpha", "s", "b"])
@@ -104,10 +174,13 @@ def create_header(params, nodelist, keys, dest, mid):
     # Compute the (beta, gamma) tuples
     # The os.urandom used to be a string of 0x00 bytes, but that's wrong
     
+    final_routing = dest + mid
+    final_routing = pack("b", len(final_routing)) + final_routing
+
     len_meta = sum(map(len, node_meta[1:]))
-    random_pad_len = (max_len - 32) - len_meta - (nu-1)*p.k - len(dest) - len(mid)
-    
-    beta = dest + mid + urandom(random_pad_len)
+    random_pad_len = (max_len - 32) - len_meta - (nu-1)*p.k - len(final_routing)
+
+    beta = final_routing + urandom(random_pad_len)
     blind = p.rho(p.hrho(asbtuples[nu-1].s), len(beta)) # [:len(beta)]
     
     beta = p.xor(beta, blind) + phi
@@ -147,6 +220,7 @@ def create_forward_message(params, nodelist, keys, dest, msg):
     assert p.k + 1 + len(dest) + len(msg) < p.m
 
     # Compute the header and the secrets
+    # dest = ()
     header, secrets = create_header(params, nodelist, keys, Dspec, b"\x00" * p.k)
 
     body = pad_body(p.m, (b"\x00" * p.k) + Denc(dest) + msg)
@@ -219,7 +293,7 @@ def test_timing():
     # nymserver = Nymserver(params, pki)
 
     # The minimal PKI involves names of nodes and keys
-    from .SphinxNode import Nenc
+    # from .SphinxNode import Nenc
     
     pkiPriv = {}
     pkiPub = {}
@@ -260,7 +334,7 @@ def test_minimal():
     params = SphinxParams(r)
 
     # The minimal PKI involves names of nodes and keys
-    from .SphinxNode import Nenc
+    # from .SphinxNode import Nenc
     
     pkiPriv = {}
     pkiPub = {}
@@ -287,8 +361,8 @@ def test_minimal():
     while True:
 
         ret = sphinx_process(params, x, header, delta)
-        (tag, (typex, valx, rest), (header, delta)) = ret
-
+        (tag, B, (header, delta)) = ret
+        typex, valx, rest = PFdecode(params, B)
 
         print("round %d" % i)
         i += 1
@@ -298,7 +372,7 @@ def test_minimal():
             addr = valx
             x = pkiPriv[addr].x 
         elif typex == "Dspec":
-            print(valx)
+            assert rest[:16] == b"\x00" * 16
             break
         else:
             print("Error")
@@ -315,7 +389,8 @@ def test_minimal():
 
     while True:
         ret = sphinx_process(params, x, header, delta)
-        (tag, (typex, valx, rest), (header, delta)) = ret
+        (tag, B, (header, delta)) = ret
+        typex, valx, rest = PFdecode(params, B)
 
         if typex == "node":
             addr = valx

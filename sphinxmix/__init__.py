@@ -23,8 +23,7 @@ to ``pki_entry`` records. Those include secret keys (derived using ``gensecret``
 keys (derived using ``expon``).
 
     >>> # The minimal PKI involves names of nodes and keys
-    >>> from sphinxmix.SphinxNode import Nenc
-    >>> from sphinxmix.SphinxClient import pki_entry
+    >>> from sphinxmix.SphinxClient import pki_entry, Nenc
     >>> pkiPriv = {}
     >>> pkiPub = {}
     >>> for i in range(10):
@@ -54,12 +53,14 @@ secret and decodes incoming messages. In this example the message encode above, 
 by the sequence of mixes.
 
     >>> # Process message by the sequence of mixes
+    >>> from sphinxmix.SphinxClient import PFdecode
     >>> from sphinxmix.SphinxNode import sphinx_process
     >>> x = pkiPriv[use_nodes[0]].x
     >>> while True:
     ...     seen = {}
     ...     ret = sphinx_process(params, x, header, delta)
-    ...     (tag, (typex, valx, rest), (header, delta)) = ret
+    ...     (tag, B, (header, delta)) = ret
+    ...     typex, valx, rest = PFdecode(params, B)
     ...     if typex == "node":
     ...         addr = valx
     ...         x = pkiPriv[addr].x 

@@ -102,11 +102,13 @@ class SphinxParams:
     k = 16 # in bytes, == 128 bits
     m = 1024 # size of message body, in bytes
 
-    def __init__(self, r=5, group=None):
+    def __init__(self, r=5, group=None, max_len = None):
         self.r = r
         self.aes = Cipher("AES-128-CTR")
 
-        self.max_len = 2*self.r*self.k + 3*self.k + 20
+        self.max_len = max_len
+        if max_len == None:
+            self.max_len = 2*self.r*self.k + 3*self.k + 20
 
         self.group = group
         if not group:

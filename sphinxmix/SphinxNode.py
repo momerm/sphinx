@@ -25,72 +25,6 @@ from binascii import hexlify
 # Python 2/3 compatibility
 from builtins import bytes
 
-# Padding/unpadding of message bodies: a 0 bit, followed by as many 1
-# bits as it takes to fill it up
-
-def pad_body(msgtotalsize, body):
-    """ Unpad the Sphinx message body."""
-    body = body + b"\x7f"
-    body = body + (b"\xff" * (msgtotalsize - len(body)))
-    return body
-
-def unpad_body(body):
-    """ Pad a Sphinx message body. """
-    body = bytes(body)
-    l = len(body) - 1
-    x_marker = bytes(b"\x7f")[0]
-    f_marker = bytes(b"\xff")[0]
-    while body[l] == f_marker and l > 0:
-        l -= 1
-    
-    if body[l] == x_marker:
-        ret = body[:l]
-    else:
-        ret = b''
-    
-    return ret
-
-# Prefix-free encoding/decoding of node names and destinations
-
-# The special destination
-Dspec = b"\x00"
-
-# Any other destination.  Must be between 1 and 127 bytes in length
-def Denc(dest):
-    dest = bytes(dest)
-    assert type(dest) is bytes
-    assert len(dest) >= 1 and len(dest) <= 127
-    return bytes([ len(dest) ]) + dest
-
-def test_Denc():
-    assert Denc(bytes(b'dest')) == b'\x04dest'
-
-# Sphinx nodes
-def Nenc(param, idnum):
-    """ The encoding of mix names. """
-    id = b"\xff" + idnum + (b"\x00" * (param.k - len(idnum) - 1))
-    assert len(id) == param.k
-    return id
-
-# Decode the prefix-free encoding.  Return the type, value, and the
-# remainder of the input string
-def PFdecode(param, s):
-    # print("Len: %s" % s[0])
-    s = s[1:]
-
-    """ Decoder of prefix free encoder for commands."""
-    assert type(s) is bytes
-    if s == b"": return None, None, None
-    if s[:1] == b'\x00': return 'Dspec', None, s[1:]
-    if s[:1] == b'\xff': return 'node', s[:param.k], s[param.k:]
-    l = s[0]
-    if l < 128: return 'dest', s[1:l+1], s[l+1:]
-    
-    print(s)
-    assert False
-    return None, None, None
-
-
 class SphinxException(Exception):
     pass
 
@@ -123,9 +57,9 @@ def sphinx_process(params, secret, header, delta):
     beta_pad = beta + (b"\x00" * (2 * p.max_len)) 
     B = p.xor(beta_pad, p.rho(p.hrho(s), len(beta_pad)))
 
-    typex, valx, rest = PFdecode(params, B)
+    length = B[0]
+    rest = B[1+length:]
 
-    # Have we seen it already?
     tag = p.htau(s)
     b = p.hb(alpha, s)
     alpha = group.expon(alpha, b)
@@ -133,6 +67,6 @@ def sphinx_process(params, secret, header, delta):
     beta = rest[p.k:p.k+(p.max_len - 32)]
     delta = p.pii(p.hpi(s), delta)
 
-    ret = (tag, (typex, valx, rest), ((alpha, beta, gamma), delta))
+    ret = (tag, B, ((alpha, beta, gamma), delta))
     return ret
 
