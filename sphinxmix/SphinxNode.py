@@ -160,20 +160,6 @@ class SphinxTestNode:
 
     def process(self, header, delta):
 
-        # if typex == "node":
-        #     return ("Node", (val, (alpha, beta, gamma), delta))
-
-        # if typex == "Dspec":
-        #     if delta[:p.k] == (b"\x00" * p.k):
-        #         type2, val, rest = PFdecode(params, delta[p.k:])
-        #         if type2 == "dest":
-        #             body = unpad_body(rest)
-        #             return ("Process", ((type2, val), body) )
-
-        # if typex == "dest":
-        #     idx = rest[:p.k]
-        #     return ("Client", ((val, idx), delta))
-
         RET = sphinx_process(self.p, self._x, header, delta)
         (tag, (typex, valx, rest), (header, delta)) = RET
         
@@ -192,7 +178,7 @@ class SphinxTestNode:
                       body = unpad_body(rest)
 
             print("Deliver [%s] to [%s]" % (body, val))
-            return (body, val)
+            return (val, body)
 
         if typex == "dest":
             idc = rest[:self.p.k]
