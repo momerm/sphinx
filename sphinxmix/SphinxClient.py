@@ -52,8 +52,8 @@ def create_header(params, nodelist, pki, dest, mid):
     """ Internal function, creating a Sphinx header, given parameters, a node list (path), 
     a pki mapping node names to keys, a destination, and a message identifier.""" 
 
-    # node_meta = [pack("b", len(n)) + n for n in nodelist]
-    node_meta = [ n for n in nodelist]
+    node_meta = [pack("b", len(n)) + n for n in nodelist]
+    # node_meta = [ n for n in nodelist]
 
     p = params
     nu = len(nodelist)
@@ -83,26 +83,35 @@ def create_header(params, nodelist, pki, dest, mid):
 
     # Compute the filler strings
     phi = b''
+    min_len = (max_len - 32)
     for i in range(1,nu):
-
-        meta_len = sum(map(len, node_meta[:i-1]))
-        min_len = (max_len - 32)  - (i-1) * p.k - meta_len
-        plain = phi + (b"\x00" * (p.k + len(node_meta[i])))
-        blind = p.rho(p.hrho(asbtuples[i-1].s))[min_len:]
+        #min = (2*(p.r-i)+3)*p.k
         
+
+        plain = phi + (b"\x00" * (p.k + len(node_meta[i])))
+
+        blind = p.rho(p.hrho(asbtuples[i-1].s), min_len+len(plain))
+        blind = blind[min_len:]
+
         phi = p.xor(plain, blind)
 
+        #print("Min: %s = %s" % (min, min_len))
+        min_len -= len(node_meta[i]) + p.k
+        
     
+    assert len(phi) == sum(map(len, node_meta[1:])) + (nu-1)*p.k
+
     # Compute the (beta, gamma) tuples
     # The os.urandom used to be a string of 0x00 bytes, but that's wrong
     
-    len_meta = sum(map(len, node_meta))    
-    random_pad_len = (max_len - 32) - len_meta - (nu - 1)*p.k - len(dest)
+    len_meta = sum(map(len, node_meta[1:]))
+    random_pad_len = (max_len - 32) - len_meta - (nu-1)*p.k - len(dest) - len(mid)
     
     beta = dest + mid + urandom(random_pad_len)
     blind = p.rho(p.hrho(asbtuples[nu-1].s), len(beta)) # [:len(beta)]
     
     beta = p.xor(beta, blind) + phi
+    assert len(beta) == (max_len - 32)
     gamma = p.mu(p.hmu(asbtuples[nu-1].s), beta)
     
     for i in range(nu-2, -1, -1):
@@ -110,13 +119,14 @@ def create_header(params, nodelist, pki, dest, mid):
         # assert len(node_id) == p.k
 
         plain_beta_len = (max_len - 32) - p.k - len(node_id)
-        plain_len = plain_beta_len + len(node_id) + p.k
-
+        
         plain = node_id + gamma + beta[:plain_beta_len]
         blind = p.rho(p.hrho(asbtuples[i].s), len(plain))
         assert len(plain) == len(blind)
 
         beta = p.xor(plain, blind)
+        print("B(%d): \n%s" % (i,hexlify(beta)))
+        assert len(beta) == (max_len - 32)
         gamma = p.mu(p.hmu(asbtuples[i].s), beta)
 
         

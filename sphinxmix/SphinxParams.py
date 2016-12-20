@@ -106,7 +106,7 @@ class SphinxParams:
         self.r = r
         self.aes = Cipher("AES-128-CTR")
 
-        self.max_len = 2*self.r*self.k + 3*self.k
+        self.max_len = 2*self.r*self.k + 3*self.k + 20
 
         self.group = group
         if not group:

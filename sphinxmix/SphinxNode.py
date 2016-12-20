@@ -75,6 +75,9 @@ def Nenc(param, idnum):
 # Decode the prefix-free encoding.  Return the type, value, and the
 # remainder of the input string
 def PFdecode(param, s):
+    print("Len: %s" % s[0])
+    s = s[1:]
+
     """ Decoder of prefix free encoder for commands."""
     assert type(s) is bytes
     if s == b"": return None, None, None
@@ -112,10 +115,13 @@ def sphinx_process(params, secret, header, delta):
     # Compute the shared secret
     s = group.expon(alpha, secret)
     
+    assert len(beta) == p.max_len - 32
+    print("B: \n%s" % hexlify(beta))
     if gamma != p.mu(p.hmu(s), beta):
         raise SphinxException("MAC mismatch.")
 
-    B = p.xor(beta + (b"\x00" * (2 * p.k)), p.rho(p.hrho(s)))
+    beta_pad = beta + (b"\x00" * (2 * p.max_len)) 
+    B = p.xor(beta_pad, p.rho(p.hrho(s), len(beta_pad)))
 
     typex, valx, rest = PFdecode(params, B)
 
@@ -124,7 +130,7 @@ def sphinx_process(params, secret, header, delta):
     b = p.hb(alpha, s)
     alpha = group.expon(alpha, b)
     gamma = rest[:p.k]
-    beta = rest[p.k:]
+    beta = rest[p.k:p.k+(p.max_len - 32)]
     delta = p.pii(p.hpi(s), delta)
 
     ret = (tag, (typex, valx, rest), ((alpha, beta, gamma), delta))
