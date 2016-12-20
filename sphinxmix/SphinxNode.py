@@ -105,11 +105,12 @@ def sphinx_process(params, secret, seen, header, delta):
     type, val, rest = PFdecode(params, B)
     delta = p.pii(p.hpi(s), delta)
 
+    b = p.hb(alpha, s)
+    alpha = group.expon(alpha, b)
+    gamma = rest[:p.k]
+    beta = rest[p.k:]
+
     if type == "node":
-        b = p.hb(alpha, s)
-        alpha = group.expon(alpha, b)
-        gamma = rest[:p.k]
-        beta = rest[p.k:]
         return ("Node", (val, (alpha, beta, gamma), delta))
 
     if type == "Dspec":
@@ -125,7 +126,6 @@ def sphinx_process(params, secret, seen, header, delta):
 
 
 # Sphinx nodes
-
 def Nenc(param, idnum):
     """ The encoding of mix names. """
     id = b"\xff" + idnum + (b"\x00" * (param.k - len(idnum) - 1))
