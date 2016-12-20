@@ -107,12 +107,15 @@ def test_params():
 class SphinxParams:
     k = 16 # in bytes, == 128 bits
     m = 1024 # size of message body, in bytes
+
     # pki = {} # mapping of node id to node
     # clients = {} # mapping of destinations to clients
 
     def __init__(self, r=5, group=None):
         self.r = r
         self.aes = Cipher("AES-128-CTR")
+
+        self.max_len = 2*self.r*self.k + 3*self.k
 
         self.group = group
         if not group:

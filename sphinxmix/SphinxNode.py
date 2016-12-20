@@ -19,6 +19,7 @@
 # <http://www.gnu.org/licenses/>.
 
 from os import urandom
+from struct import unpack
 
 # Python 2/3 compatibility
 from builtins import bytes
@@ -79,6 +80,8 @@ def sphinx_process(params, secret, seen, header, delta):
         - ("Client", ((receiver, surbid), delta)): The SURB reply needs to be send to the receiver with a surbid index.
      """
     p = params
+    max_len = p.max_len
+
     group = p.group
 
     alpha, beta, gamma = header
@@ -96,20 +99,30 @@ def sphinx_process(params, secret, seen, header, delta):
     if tag in seen:
         raise SphinxException("Message already processed.")
 
+    # assert len(beta) == max_len
     if gamma != p.mu(p.hmu(s), beta):
         raise SphinxException("MAC mismatch.")
 
     seen[tag] = 1
 
-    B = p.xor(beta + (b"\x00" * (2 * p.k)), p.rho(p.hrho(s)))
+    beta_pad = beta + (b"\x00" * max_len)
+    B = p.xor(beta_pad, p.rho(p.hrho(s), len(beta_pad)))
+    
+    routing_size = unpack("b",B[:1])[0]
+    routing_info = B[1:1+routing_size]
+    rest = B[1+routing_size:]
 
-    type, val, rest = PFdecode(params, B)
+    #B = p.xor(beta + (b"\x00" * (2 * p.k)), p.rho(p.hrho(s)))
+    #assert B[:1] == b"\x88"
+    #B = B[1:]
+
+    type, val, rest2 = PFdecode(params, routing_info)
 
     if type == "node":
         b = p.hb(alpha, s)
         alpha = group.expon(alpha, b)
-        gamma = B[p.k:p.k*2]
-        beta = B[p.k*2:]
+        gamma = rest[:p.k]
+        beta = rest[p.k:p.k + max_len]
         delta = p.pii(p.hpi(s), delta)
         return ("Node", (val, (alpha, beta, gamma), delta))
 
@@ -118,7 +131,7 @@ def sphinx_process(params, secret, seen, header, delta):
         if delta[:p.k] == (b"\x00" * p.k):
             type2, val, rest = PFdecode(params, delta[p.k:])
             if type2 == "dest":
-                body = unpad_body(rest)
+                body = unpad_body(rest2)
                 return ("Process", ((type2, val), body) )
 
     if type == "dest":

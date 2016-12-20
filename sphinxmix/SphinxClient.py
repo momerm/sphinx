@@ -21,6 +21,7 @@
 
 from os import urandom
 from collections import namedtuple
+from struct import pack
 
 # Python 2/3 compatibility
 from builtins import bytes
@@ -49,12 +50,12 @@ def rand_subset(lst, nu):
 def create_header(params, nodelist, pki, dest, mid):
     """ Internal function, creating a Sphinx header, given parameters, a node list (path), 
     a pki mapping node names to keys, a destination, and a message identifier.""" 
-    node_meta = [n for n in nodelist]
+    node_meta = [pack("b", len(n)) + n for n in nodelist]
 
     p = params
     nu = len(nodelist)
 
-    max_len = 2*p.r*p.k + 3*p.k
+    max_len = p.max_len
 
     assert nu <= p.r
     assert len(mid) == p.k
@@ -80,13 +81,13 @@ def create_header(params, nodelist, pki, dest, mid):
     phi = b''
     for i in range(1,nu):
         # min = (2*(p.r-i) + 3)*p.k
-        len_meta = sum(map(len,node_meta[:i]))
-
+        len_meta = sum(map(len, node_meta[:i]))
         min_len = max_len - i*p.k - len_meta
 
         # Debug info
-        min_len2 = 2*(p.r-i)*p.k + 3*p.k
-        assert min_len == min_len2
+        # min_len2 = 2*(p.r-i)*p.k + 3*p.k
+        # assert min_len == min_len2
+        # End
 
         plain = phi + (b"\x00" * (p.k + len(node_meta[i])))
         blind = p.rho(p.hrho(asbtuples[i-1].s))[min_len:]
@@ -97,18 +98,20 @@ def create_header(params, nodelist, pki, dest, mid):
     # Compute the (beta, gamma) tuples
     # The os.urandom used to be a string of 0x00 bytes, but that's wrong
     
-    len_meta = sum(map(len,node_meta))    
+    len_meta = sum(map(len, node_meta))    
     random_pad_len = max_len - len_meta - (nu + 1)*p.k - len(dest)
     
     # Debug info
-    random_pad_len2 = ((2 * (p.r - nu) + 2)*p.k - len(dest))
-    assert random_pad_len == random_pad_len2
+    # random_pad_len2 = ((2 * (p.r - nu) + 2)*p.k - len(dest))
+    # assert random_pad_len == random_pad_len2
+    # End
 
     beta = dest + mid + urandom(random_pad_len)
 
     # Debug info
-    len_beta = (2*(p.r-nu)+3)*p.k
-    assert len(beta) == len_beta
+    # len_beta = (2*(p.r-nu)+3)*p.k
+    # assert len(beta) == len_beta
+    # End
 
     blind = p.rho(p.hrho(asbtuples[nu-1].s))[:len(beta)]
     assert len(beta) == len(blind)
@@ -117,16 +120,17 @@ def create_header(params, nodelist, pki, dest, mid):
     gamma = p.mu(p.hmu(asbtuples[nu-1].s), beta)
     
     for i in range(nu-2, -1, -1):
-        node_id = nodelist[i+1]
-        assert len(node_id) == p.k
+        node_id = node_meta[i+1]
+        # assert len(node_id) == p.k
 
         
         plain_beta_len = max_len - 3*p.k - len(node_id)
         
         # Debug info
-        plain_beta_len2 = (2*p.r-1)*p.k
-        assert plain_beta_len == plain_beta_len2
-        assert plain_beta_len + len(node_id) + p.k == (2*p.r+1)*p.k
+        # plain_beta_len2 = (2*p.r-1)*p.k
+        # assert plain_beta_len == plain_beta_len2
+        # assert plain_beta_len + len(node_id) + p.k == (2*p.r+1)*p.k
+        # End
 
         plain_len = plain_beta_len + len(node_id) + p.k
 
