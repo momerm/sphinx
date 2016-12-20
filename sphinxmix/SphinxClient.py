@@ -44,6 +44,10 @@ def pad_body(msgtotalsize, body):
     """ Unpad the Sphinx message body."""
     body = body + b"\x7f"
     body = body + (b"\xff" * (msgtotalsize - len(body)))
+
+    if (msgtotalsize - len(body)) < 0:
+        raise SphinxException("Insufficient space for body") 
+
     return body
 
 def unpad_body(body):
@@ -151,6 +155,9 @@ def create_header(params, nodelist, keys, dest):
     len_meta = sum(map(len, node_meta[1:]))
     random_pad_len = (max_len - 32) - len_meta - (nu-1)*p.k - len(final_routing)
 
+    if random_pad_len < 0:
+        raise SphinxException("Insufficient space routing info") 
+
     beta = final_routing + urandom(random_pad_len)
     blind = p.rho(p.hrho(asbtuples[nu-1].s), len(beta)) # [:len(beta)]
     
@@ -235,6 +242,8 @@ def package_surb(params, nymtuple, message):
 
 
 def receive_forward(params, delta):
+    """ Decodes the body of a forward message."""
+    
     if delta[:params.k] != b"\x00" * params.k:
         raise SphinxException("Modified Body")
 
@@ -363,9 +372,7 @@ def test_minimal():
 
     x = pkiPriv[use_nodes[0]].x
 
-    i = 0 
     while True:
-        i += 1
         ret = sphinx_process(params, x, header, delta)
         (tag, B, (header, delta)) = ret
         routing = PFdecode(params, B)
@@ -374,7 +381,7 @@ def test_minimal():
             flag, addr = routing
             x = pkiPriv[addr].x 
         elif routing[0] == Surb_flag:
-            flag, myname, myid = routing
+            flag, dest, myid = routing
             break
 
     received = receive_surb(params, surbkeytuple, delta)

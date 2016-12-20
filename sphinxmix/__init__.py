@@ -11,6 +11,9 @@ is used by all subsequent functions. To make ``sphinxmix`` use different cryptog
 primitives simply extend this class, or re-implement it. The default cryptographic primitives 
 are ``NIST/SEGS-p224`` curves, ``AES`` and ``SHA256``.
 
+Sending Sphinx messages
+-----------------------
+
 To package or process sphinx messages create a new ``SphinxParams`` object:
 
     >>> # Instantiate a the crypto parameters for Sphinx.
@@ -49,12 +52,15 @@ first mix. Note both destination and message need to be ``bytes``.
     >>> header, delta = create_forward_message(params, nodes_routing, \\
     ...     keys_nodes, dest, message)
 
+Processing Sphinx messages at a mix
+-----------------------------------
+
 The heart of a Sphinx mix server is the ``sphinx_process`` function, that takes the server
 secret and decodes incoming messages. In this example the message encode above, is decoded
 by the sequence of mixes.
 
     >>> # Process message by the sequence of mixes
-    >>> from sphinxmix.SphinxClient import PFdecode, Relay_flag, Dest_flag, receive_forward
+    >>> from sphinxmix.SphinxClient import PFdecode, Relay_flag, Dest_flag, Surb_flag, receive_forward
     >>> from sphinxmix.SphinxNode import sphinx_process
     >>> x = pkiPriv[use_nodes[0]].x
     >>> while True:
@@ -68,6 +74,47 @@ by the sequence of mixes.
     ...         assert receive_forward(params, delta) == [dest, message]
     ...         break
     
+Single use reply Blocks
+-----------------------
+
+A facility provided by Sphinx is the creation and use of Single Use Reply Blocks (SURB)
+to route messages back to an anonymous receipient. First a receiver needs to create
+a SURB using ``create_surb`` and passes on the ``nymtuple`` structure to the sender, and
+storing ``surbkeytuple`` keyed by the identifier ``surbid``:
+
+    >>> from sphinxmix.SphinxClient import create_surb, package_surb
+    >>> surbid, surbkeytuple, nymtuple = create_surb(params, nodes_routing, keys_nodes, b"myself")
+
+Using the ``nymtuple`` a sender can package a message to be sent through the network, 
+starting at the ``nymtuple[0]`` router:
+
+    >>> message = b"This is a reply"
+    >>> header, delta = package_surb(params, nymtuple, message)
+
+The network processes the SURB as any other message, until it is received 
+by the last mix in the path:
+
+    >>> x = pkiPriv[use_nodes[0]].x
+    >>> while True:
+    ...    ret = sphinx_process(params, x, header, delta)
+    ...    (tag, B, (header, delta)) = ret
+    ...    routing = PFdecode(params, B)
+    ...
+    ...    if routing[0] == Relay_flag:
+    ...        flag, addr = routing
+    ...        x = pkiPriv[addr].x 
+    ...    elif routing[0] == Surb_flag:
+    ...        flag, dest, myid = routing
+    ...        break
+
+The final mix server must sent the ``myid`` and ``delta`` to the destination
+``dest``, where it may be decoded using the ``surbkeytuple``.
+
+    >>> from sphinxmix.SphinxClient import receive_surb
+    >>> received = receive_surb(params, surbkeytuple, delta)
+    >>> assert received == message
+
+
 """
 
 VERSION = "0.0.2"

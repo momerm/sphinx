@@ -32,19 +32,29 @@ To upload a new distribution of ``sphinxmix`` the maintainer simply uses::
 
 
 Core classes and functions
---------------------------
+==========================
 
 .. autoclass:: sphinxmix.SphinxParams.SphinxParams
 
 .. autoclass:: sphinxmix.SphinxParams.Group_ECC
 
+Client functions
+----------------
+
 .. autofunction:: sphinxmix.SphinxClient.pki_entry
 
-.. autofunction:: sphinxmix.SphinxNode.Nenc
+.. autofunction:: sphinxmix.SphinxClient.Nenc
+
+.. autofunction:: sphinxmix.SphinxClient.PFdecode
 
 .. autofunction:: sphinxmix.SphinxClient.rand_subset
     
 .. autofunction:: sphinxmix.SphinxClient.create_forward_message
+
+.. autofunction:: sphinxmix.SphinxClient.receive_forward
+
+Mix functions
+-------------
 
 .. autofunction:: sphinxmix.SphinxNode.sphinx_process
 
