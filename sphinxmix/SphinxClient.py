@@ -84,17 +84,14 @@ def create_header(params, nodelist, pki, dest, mid):
     # Compute the filler strings
     phi = b''
     for i in range(1,nu):
-        # min = (2*(p.r-i) + 3)*p.k
-        len_meta = sum(map(len, node_meta[:i]))
-        min_len = (max_len - 32)  - (i-2) * p.k - len_meta
 
-
+        meta_len = sum(map(len, node_meta[:i+1]))
+        min_len = (max_len - 32)  - i * p.k - meta_len
         plain = phi + (b"\x00" * (p.k + len(node_meta[i])))
         blind = p.rho(p.hrho(asbtuples[i-1].s))[min_len:]
-        assert len(plain) == len(blind)
-
+        
         phi = p.xor(plain, blind)
-        # print("Phi(%d): %s" % (i, hexlify(phi)))
+
     
     # Compute the (beta, gamma) tuples
     # The os.urandom used to be a string of 0x00 bytes, but that's wrong
@@ -104,8 +101,7 @@ def create_header(params, nodelist, pki, dest, mid):
     
     beta = dest + mid + urandom(random_pad_len)
     blind = p.rho(p.hrho(asbtuples[nu-1].s), len(beta)) # [:len(beta)]
-    assert len(beta) == len(blind)
-
+    
     beta = p.xor(beta, blind) + phi
     gamma = p.mu(p.hmu(asbtuples[nu-1].s), beta)
     
@@ -121,12 +117,9 @@ def create_header(params, nodelist, pki, dest, mid):
         assert len(plain) == len(blind)
 
         beta = p.xor(plain, blind)
-        print("Beta %d: \n%s" % (i, hexlify(beta)))
         gamma = p.mu(p.hmu(asbtuples[i].s), beta)
 
-        print("Actual beta len: %d" % len(beta))
-
-    assert len(beta) == max_len - 32
+        
     return (asbtuples[0].alpha, beta, gamma), \
         [x.s for x in asbtuples]
 
