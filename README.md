@@ -1,3 +1,27 @@
+The Sphinxmix pyhton package
+============================
+
+The ``sphinxmix`` package implements the Sphinx mix packet format core cryptographic functions.
+
+The paper describing sphinx may be found here:
+
+    * George Danezis and Ian Goldberg. Sphinx: A Compact and Provably Secure Mix Format. IEEE Symposium on Security and Privacy 2009. [`link <http://www.cypherpunks.ca/~iang/pubs/Sphinx_Oakland09.pdf>`_]
+
+Beyond the original proposal it allows for clients to communicate additional information to mix servers to implement arbitrary mixing strategies.
+
+More information
+----------------
+
+The sphinxmix python package may be installed from pypi using pip: https://pypi.python.org/pypi/sphinxmix/
+
+The documentation for sphinxmix may be found on Read the Docs: http://sphinxmix.readthedocs.io/en/latest/
+
+The Git repository for sphinxmix may be found at the UCL Information Security repository at: https://github.com/UCL-InfoSec/sphinx
+
+
+Licence
+-------
+
 Sphinx v0.8-UCL README
 2016-11-12
 George Danezis <g.danezis@ucl.ac.uk>
