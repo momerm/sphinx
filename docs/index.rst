@@ -45,6 +45,12 @@ Client functions
 
 .. autofunction:: sphinxmix.SphinxClient.Nenc
 
+.. autodata:: sphinxmix.SphinxClient.Relay_flag
+
+.. autodata:: sphinxmix.SphinxClient.Dest_flag
+
+.. autodata:: sphinxmix.SphinxClient.Surb_flag
+
 .. autofunction:: sphinxmix.SphinxClient.PFdecode
 
 .. autofunction:: sphinxmix.SphinxClient.rand_subset

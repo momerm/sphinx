@@ -30,14 +30,9 @@ from . import SphinxException
 # Core Process function -- devoid of any chrome
 def sphinx_process(params, secret, header, delta):
     """ The heart of a Sphinx server, that processes incoming messages.
-    It takes a set of parameters, the secret of the server, the dictionary of seen messages,
+    It takes a set of parameters, the secret of the server,
     and an incoming message header and body.
-    
-    It may return 3 structures:
-        - ("Node", (nextmix, header, delta)): The message needs to be forwarded to the next mix.
-        - ("Process", ((type, receiver), body)): The message should be sent to the final receiver.
-        - ("Client", ((receiver, surbid), delta)): The SURB reply needs to be send to the receiver with a surbid index.
-    
+        
     """
     p = params
     group = p.group

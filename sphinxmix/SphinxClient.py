@@ -33,12 +33,24 @@ from . import SphinxException
 
 
 # FLAGS
+
+#: Routing flag indicating message is to be relayed.
 Relay_flag = "\xF0"
+
+#: Routing flag indicating message is to be delivered.
 Dest_flag = "\xF1"
+
+#: Routing flag indicating surb reply is to be delivered.
 Surb_flag = "\xF2"
 
 # Padding/unpadding of message bodies: a 0 bit, followed by as many 1
 # bits as it takes to fill it up
+
+header_record = namedtuple("header_record", ["alpha", "s", "b", "aes"])
+
+#: A helper named tuple to store PKI information.
+pki_entry = namedtuple("pki_entry", ["id", "x", "y"])
+
 
 def pad_body(msgtotalsize, body):
     """ Unpad the Sphinx message body."""
@@ -79,13 +91,9 @@ def Route_pack(info):
 # Decode the prefix-free encoding.  Return the type, value, and the
 # remainder of the input string
 def PFdecode(param, packed):
-    """ Decoder of prefix free encoder for commands."""
+    """ Decoder of prefix free encoder for commands received by mix or clients."""
     assert type(packed) is bytes
     return decode(packed)
-
-
-header_record = namedtuple("header_record", ["alpha", "s", "b", "aes"])
-pki_entry = namedtuple("pki_entry", ["id", "x", "y"])
 
 
 def rand_subset(lst, nu):
@@ -144,8 +152,7 @@ def create_header(params, nodelist, keys, dest):
     # Compute the (beta, gamma) tuples
     # The os.urandom used to be a string of 0x00 bytes, but that's wrong
     
-    final_routing = dest
-    final_routing = pack("b", len(final_routing)) + final_routing
+    final_routing = pack("b", len(dest)) + dest
 
     len_meta = sum(map(len, node_meta[1:]))
     random_pad_len = (max_len - 32) - len_meta - (nu-1)*p.k - len(final_routing)
@@ -175,8 +182,8 @@ def create_header(params, nodelist, keys, dest):
 def create_forward_message(params, nodelist, keys, dest, msg):
     """Creates a forward Sphix message, ready to be processed by a first mix. 
 
-    It takes as parameters a node list of mix ids, forming the path of the message;
-    a pki mapping mode names to keys; a destination and a message (byte arrays)."""
+    It takes as parameters a node list of mix information, that will be provided to each mix, forming the path of the message;
+    a list of public keys of all intermediate mixes; a destination and a message (byte arrays)."""
 
     p = params
     # pki = p.pki
