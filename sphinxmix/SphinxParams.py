@@ -167,11 +167,6 @@ class SphinxParams:
 
         return r0
 
-    # The PRG; key is of length k, output is of length other
-    def rho(self, key, other):
-        assert len(key) == self.k
-        p = b"\x00" * other
-        return self.aes_ctr(key, p)
 
     def xor_rho(self, key, plain):
         assert len(key) == self.k
