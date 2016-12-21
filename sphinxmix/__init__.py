@@ -122,6 +122,41 @@ The final mix server must sent the ``myid`` and ``delta`` to the destination
     >>> received = receive_surb(params, surbkeytuple, delta)
     >>> assert received == message
 
+Embedding arbitrary information for mixes
+-----------------------------------------
+
+A sender may embed arbitrary information to mix nodes, as demonstrated 
+by embedding ``b'info'`` to each mix, and ``b'final_info'`` to the final 
+mix:
+
+    >>> use_nodes = rand_subset(pkiPub.keys(), 5)
+    >>> nodes_routing = [Nenc((n, b'info')) for n in use_nodes]
+    >>> keys_nodes = [pkiPub[n].y for n in use_nodes]
+    >>> dest = (b"bob", b"final_info")
+    >>> message = b"this is a test"
+    >>> header, delta = create_forward_message(params, nodes_routing, \\
+    ...     keys_nodes, dest, message)
+
+Mixes decode the arbitrary structure passed by the clients, and can interpret
+it to implement more complex mixing strategies:
+
+    >>> x = pkiPriv[use_nodes[0]].x
+    >>> while True:
+    ...     ret = sphinx_process(params, x, header, delta)
+    ...     (tag, info, (header, delta)) = ret
+    ...     routing = PFdecode(params, info)
+    ...     if routing[0] == Relay_flag:
+    ...         flag, (addr, additional_info) = routing
+    ...         assert additional_info == b'info'
+    ...         x = pkiPriv[addr].x 
+    ...     elif routing[0] == Dest_flag:
+    ...         [[dest, additional_info], msg] = receive_forward(params, delta)
+    ...         assert additional_info == b'final_info'
+    ...         assert dest == b'bob'
+    ...         break
+
+
+
 
 """
 
