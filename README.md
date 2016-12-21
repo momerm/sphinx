@@ -27,6 +27,7 @@ Sphinx v0.8-UCL README
 2016-11-12
 George Danezis <g.danezis@ucl.ac.uk>
 
+```
 # Copyright 2011 Ian Goldberg
 # Copyright 2016 George Danezis (UCL InfoSec Group)
 #
@@ -44,5 +45,6 @@ George Danezis <g.danezis@ucl.ac.uk>
 # You should have received a copy of the GNU Lesser General Public
 # License along with Sphinx.  If not, see
 # <http://www.gnu.org/licenses/>.
+```
 
 This is a UCL branch and port of the original Sphinx software to using modern python libraries, including petlib for cryptography and msgpack for binary formats. It also decouples the message processing from other concerns to allow sphix to be embedded into other applications. It is based on the original software by Ian Goldberg (U. Waterloo) and retains both his copyright and the original LGPL licence.
