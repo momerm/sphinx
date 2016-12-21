@@ -49,25 +49,26 @@ def sphinx_process(params, secret, header, delta):
 
     # Compute the shared secret
     s = group.expon(alpha, secret)
+    aes_s = p.get_aes_key(s)
     
     assert len(beta) == p.max_len - 32
     # print("B: \n%s" % hexlify(beta))
-    if gamma != p.mu(p.hmu(s), beta):
+    if gamma != p.mu(p.hmu(aes_s), beta):
         raise SphinxException("MAC mismatch.")
 
     beta_pad = beta + (b"\x00" * (2 * p.max_len)) 
-    B = p.xor(beta_pad, p.rho(p.hrho(s), len(beta_pad)))
+    B = p.xor_rho(p.hrho(aes_s), beta_pad)
 
     length = B[0]
     routing = B[1:1+length]
     rest = B[1+length:]
 
-    tag = p.htau(s)
-    b = p.hb(alpha, s)
+    tag = p.htau(aes_s)
+    b = p.hb(alpha, aes_s)
     alpha = group.expon(alpha, b)
     gamma = rest[:p.k]
     beta = rest[p.k:p.k+(p.max_len - 32)]
-    delta = p.pii(p.hpi(s), delta)
+    delta = p.pii(p.hpi(aes_s), delta)
 
     ret = (tag, routing, ((alpha, beta, gamma), delta))
     return ret

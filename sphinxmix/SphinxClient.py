@@ -84,7 +84,7 @@ def PFdecode(param, packed):
     return decode(packed)
 
 
-header_record = namedtuple("header_record", ["alpha", "s", "b"])
+header_record = namedtuple("header_record", ["alpha", "s", "b", "aes"])
 pki_entry = namedtuple("pki_entry", ["id", "x", "y"])
 
 
@@ -109,10 +109,6 @@ def create_header(params, nodelist, keys, dest):
     p = params
     nu = len(nodelist)
     max_len = p.max_len
-
-
-    assert nu <= p.r
-    assert len(dest) <= 2 * (p.r - nu + 1) * p.k
     
     group = p.group
     x = group.gensecret()
@@ -123,10 +119,12 @@ def create_header(params, nodelist, keys, dest):
     for k in keys:
         alpha = group.expon(group.g, blind_factor)
         s = group.expon(k, blind_factor)
-        b = p.hb(alpha, s)
+        aes_s = p.get_aes_key(s)
+
+        b = p.hb(alpha, aes_s)
         blind_factor = blind_factor.mod_mul(b, p.group.G.order())
-        
-        hr = header_record(alpha, s, b)
+
+        hr = header_record(alpha, s, b, aes_s)
         asbtuples.append(hr)
 
     # Compute the filler strings
@@ -135,11 +133,8 @@ def create_header(params, nodelist, keys, dest):
     for i in range(1,nu):
 
         plain = phi + (b"\x00" * (p.k + len(node_meta[i])))
-
-        blind = p.rho(p.hrho(asbtuples[i-1].s), min_len+len(plain))
-        blind = blind[min_len:]
-
-        phi = p.xor(plain, blind)
+        phi = p.xor_rho(p.hrho(asbtuples[i-1].aes), (b"\x00"*min_len)+plain)
+        phi = phi[min_len:]
 
         min_len -= len(node_meta[i]) + p.k
         
@@ -159,10 +154,9 @@ def create_header(params, nodelist, keys, dest):
         raise SphinxException("Insufficient space routing info") 
 
     beta = final_routing + urandom(random_pad_len)
-    blind = p.rho(p.hrho(asbtuples[nu-1].s), len(beta)) # [:len(beta)]
-    
-    beta = p.xor(beta, blind) + phi
-    gamma = p.mu(p.hmu(asbtuples[nu-1].s), beta)
+    beta = p.xor_rho(p.hrho(asbtuples[nu-1].aes), beta) + phi
+
+    gamma = p.mu(p.hmu(asbtuples[nu-1].aes), beta)
     
     for i in range(nu-2, -1, -1):
         node_id = node_meta[i+1]
@@ -170,14 +164,12 @@ def create_header(params, nodelist, keys, dest):
         plain_beta_len = (max_len - 32) - p.k - len(node_id)
         
         plain = node_id + gamma + beta[:plain_beta_len]
-        blind = p.rho(p.hrho(asbtuples[i].s), len(plain))
-
-        beta = p.xor(plain, blind)
-        gamma = p.mu(p.hmu(asbtuples[i].s), beta)
-
+        
+        beta = p.xor_rho(p.hrho(asbtuples[i].aes), plain)        
+        gamma = p.mu(p.hmu(asbtuples[i].aes), beta)
         
     return (asbtuples[0].alpha, beta, gamma), \
-        [x.s for x in asbtuples]
+        [x.aes for x in asbtuples]
 
 
 def create_forward_message(params, nodelist, keys, dest, msg):
@@ -272,13 +264,13 @@ def receive_surb(params, keytuple, delta):
 
 def test_timing():
     r = 5
-    params = SphinxParams(r)
+    params = SphinxParams()
     pki = {}
     
     pkiPriv = {}
     pkiPub = {}
 
-    for i in range(2*r):
+    for i in range(10):
         nid = pack("b", i)
         x = params.group.gensecret()
         y = params.group.expon(params.group.g, x)
@@ -311,14 +303,14 @@ def test_timing():
 def test_minimal():
     from .SphinxParams import SphinxParams
     r = 5
-    params = SphinxParams(r)
+    params = SphinxParams()
 
     # The minimal PKI involves names of nodes and keys
     
     pkiPriv = {}
     pkiPub = {}
 
-    for i in range(2*r):
+    for i in range(10):
         nid = pack("b", i) # Nenc(params, bytes([i]))
         x = params.group.gensecret()
         y = params.group.expon(params.group.g, x)

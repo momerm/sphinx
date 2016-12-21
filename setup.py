@@ -18,6 +18,5 @@ setup(name='sphinxmix',
             "pytest >= 2.5.0",
             "msgpack-python >= 0.4.6",
             "petlib >= 0.0.38",
-            "numpy >= 1.11.0",
       ]
 )

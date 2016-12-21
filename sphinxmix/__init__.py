@@ -18,7 +18,7 @@ To package or process sphinx messages create a new ``SphinxParams`` object:
 
     >>> # Instantiate a the crypto parameters for Sphinx.
     >>> from sphinxmix.SphinxParams import SphinxParams
-    >>> params = SphinxParams(r = 5)
+    >>> params = SphinxParams()
 
 The ``sphinxmix`` package requires some rudimentary Public Key Information: mix nodes need
 an identifier created by ``Nenc`` and the PKI consists of a dictionary mapping node names
