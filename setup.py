@@ -7,10 +7,13 @@ setup(name='sphinxmix',
       description='A Python implementation of the Sphinx mix packet format.',
       author='George Danezis',
       author_email='g.danezis@ucl.ac.uk',
-      url=r'https://pypi.python.org/pypi/sphinxmix/',
+      url=r'http://sphinxmix.readthedocs.io/en/latest/',
       packages=['sphinxmix'],
       license="2-clause BSD",
-      long_description="""A Python implementation of the Sphinx mix packet format.""",
+      long_description="""A Python implementation of the Sphinx mix packet format.
+
+      For full documentation see: http://sphinxmix.readthedocs.io/en/latest/
+      """,
 
       setup_requires=["pytest >= 2.6.4"],
       install_requires=[
