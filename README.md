@@ -1,6 +1,10 @@
 The Sphinxmix pyhton package
 ============================
 
+[![Build Status](https://travis-ci.org/UCL-InfoSec/sphinx.svg?branch=master)](https://travis-ci.org/UCL-InfoSec/sphinx)
+[![Documentation Status](https://readthedocs.org/projects/sphinxmix/badge/?version=latest)](http://sphinxmix.readthedocs.io/en/latest/?badge=latest)
+[![PyPI](https://img.shields.io/pypi/v/sphinxmix.svg)]()
+
 The ``sphinxmix`` package implements the Sphinx mix packet format core cryptographic functions.
 
 The paper describing sphinx may be found here:
