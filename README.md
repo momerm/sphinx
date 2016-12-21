@@ -5,7 +5,8 @@ The ``sphinxmix`` package implements the Sphinx mix packet format core cryptogra
 
 The paper describing sphinx may be found here:
 
-    * George Danezis and Ian Goldberg. Sphinx: A Compact and Provably Secure Mix Format. IEEE Symposium on Security and Privacy 2009. [`link <http://www.cypherpunks.ca/~iang/pubs/Sphinx_Oakland09.pdf>`_]
+George Danezis and Ian Goldberg. Sphinx: A Compact and Provably Secure Mix Format. IEEE Symposium on Security and Privacy 2009. 
+http://www.cypherpunks.ca/~iang/pubs/Sphinx_Oakland09.pdf
 
 Beyond the original proposal it allows for clients to communicate additional information to mix servers to implement arbitrary mixing strategies.
 
