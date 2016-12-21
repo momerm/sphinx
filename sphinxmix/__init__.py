@@ -160,7 +160,7 @@ it to implement more complex mixing strategies:
 
 """
 
-VERSION = "0.0.3"
+VERSION = "0.0.4"
 
 class SphinxException(Exception):
     pass

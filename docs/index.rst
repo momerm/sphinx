@@ -22,6 +22,9 @@ Basic usage
 Development
 -----------
 
+The git repository for ``sphinxmix`` can be cloned from here:
+https://github.com/UCL-InfoSec/sphinx
+
 The ``pytest`` unit tests and doctests of ``sphinxmix`` may be ran using ``tox`` simply through the command::
 
 	$ tox
