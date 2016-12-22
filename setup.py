@@ -4,19 +4,18 @@ from Cython.Build import cythonize, build_ext
 
 import sphinxmix
 
-ext = Extension("sphinxmix.SphinxCrypto", 
-                        ["sphinxmix/SphinxCrypto.pyx"],
-                          libraries=["crypto"])
-                
+
 
 if __name__ == "__main__":
       
       setup(name='sphinxmix',
             # packages = find_packages(),
             # ext_modules = cythonize("sphinxmix/SphinxCrypto.pyx", libraries = ['crypto']),
-            #ext_modules = cythonize([
-            #    ),
-            extensions = ext,
+            ext_modules = cythonize([
+                Extension("sphinxmix.SphinxCrypto", 
+                        ["sphinxmix/SphinxCrypto.pyx"],
+                          libraries=["crypto"])
+                ]),
             version=sphinxmix.VERSION,
             description='A Python implementation of the Sphinx mix packet format.',
             author='George Danezis',
