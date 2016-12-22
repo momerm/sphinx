@@ -25,6 +25,7 @@
 
 from os import urandom
 from hashlib import sha256
+from collections import namedtuple
 import hmac
 
 from petlib.ec import EcGroup, EcPt, POINT_CONVERSION_UNCOMPRESSED
@@ -33,6 +34,9 @@ from petlib.cipher import Cipher
 
 # Python 2/3 compatibility
 from builtins import bytes
+
+aes_keys = namedtuple("aes_keys", ["hb", "hrho", "hmu", "hpi", "htau"])
+
 
 class Group_ECC:
     "Group operations in ECC"
@@ -106,6 +110,13 @@ class SphinxParams:
         if not group:
             self.group = Group_ECC()
 
+        self.crypto = None
+        try:
+            from .SphinxCrypto import crypto
+            self.crypto = crypto()
+        except:
+            pass
+
 
     # The LIONESS PRP
 
@@ -117,27 +128,29 @@ class SphinxParams:
         return bytes(c)
 
     def lioness_enc(self, key, message):
+        if self.crypto != None:
+            return self.crypto.lioness_enc(self.k, key, message)
+
         assert len(key) == self.k
         assert len(message) >= self.k * 2
 
+        xshort, xlong = message[:self.k], message[self.k:]
+
         # Round 1
-        k1 = self.hash(message[self.k:]+key+b'1')[:self.k]
-        c = self.aes_ctr(key, message[:self.k], iv = k1)
-        r1 = c + message[self.k:]
-
+        k1 = self.hash(xlong+key+b'1')[:self.k]
+        xshort = self.aes_ctr(key, xshort, iv = k1)
+        
         # Round 2
-        c = self.aes_ctr(key, r1[self.k:], iv = r1[:self.k])
-        r2 = r1[:self.k] + c
-
+        xlong = self.aes_ctr(key, xlong, iv = xshort)
+        
         # Round 3
-        k3 = self.hash(r2[self.k:]+key+b'3')[:self.k]
-        c = self.aes_ctr(key, r2[:self.k], iv = k3)
-        r3 = c + r2[self.k:]
-
+        k3 = self.hash(xlong+key+b'3')[:self.k]
+        xshort = self.aes_ctr(key, xshort, iv = k3)
+        
         # Round 4
-        c = self.aes_ctr(key, r3[self.k:], r3[:self.k])
-        r4 = r3[:self.k] + c
-
+        xlong = self.aes_ctr(key, xlong, xshort)
+        
+        r4 = xshort + xlong
         return r4
 
     def lioness_dec(self, key, message):
@@ -199,36 +212,38 @@ class SphinxParams:
         return sha256(data).digest()
 
     def get_aes_key(self, s):
+        "Compute all symmetric keys"
         group = self.group
-        return self.hash(b"aes_key:" + group.printable(s))[:self.k]
+        master_K = self.hash(b"aes_key:" + group.printable(s))[:self.k]
 
-    def derive_key(self, k, flavor):
-        iv = flavor
-        m = b"\x00" * 16
-        K = self.aes.enc(k, iv).update(m)
+        iv = b"\x08" * 16
+        m = b"\x00" * (16 * 5)
+        K = self.aes.enc(master_K, iv).update(m)
+
+        # aes_keys = namedtuple("aes_keys", ["hb", "hrho", "hmu", "hpi", "htau"])
+        Ks = []
+        for i in range(5):
+            Ks.append(K[i*16:i*16+16])
+
+        K = aes_keys(self.group.makeexp(Ks[0]), *Ks[1:])
         return K
-
+        
     def hb(self, alpha, k):
         "Compute a hash of alpha and s to use as a blinding factor"
-        K = self.derive_key(k, b"hbhbhbhbhbhbhbhb")
-        return self.group.makeexp(K)
-
+        return k.hb
+        
     def hrho(self, k):
         "Compute a hash of s to use as a key for the PRG rho"
-        K = self.derive_key(k, b"hrhohrhohrhohrho")
-        return K
+        return k.hrho
 
     def hmu(self, k):
         "Compute a hash of s to use as a key for the HMAC mu"
-        K = self.derive_key(k, b"hmu:hmu:hmu:hmu:")
-        return K
+        return k.hmu
 
     def hpi(self, k):
         "Compute a hash of s to use as a key for the PRP pi"
-        K = self.derive_key(k, b"hpi:hpi:hpi:hpi:")
-        return K
+        return k.hpi
 
     def htau(self, k):
         "Compute a hash of s to use to see if we've seen s before"
-        K = self.derive_key(k, b"htauhtauhtauhtau")
-        return K
+        return k.htau

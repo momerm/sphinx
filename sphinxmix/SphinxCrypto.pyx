@@ -4,6 +4,8 @@ from cpython.mem cimport PyMem_Malloc, PyMem_Realloc, PyMem_Free
 
 cdef extern from "openssl/evp.h":
 
+    # The CIPHER functions
+
     ctypedef struct ENGINE:
         pass
 
@@ -43,15 +45,10 @@ cdef extern from "openssl/evp.h":
     int  EVP_CipherUpdate(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl, const unsigned char *inm, int inl)
     int  EVP_CipherFinal_ex(EVP_CIPHER_CTX *ctx, unsigned char *outm, int *outl)
 
+    # The HMAC functions
+
     ctypedef struct HMAC_CTX:
         pass
-
-    ctypedef struct EVP_MD:
-        pass
-
-    int EVP_MD_size(const EVP_MD *md)
-    int EVP_MD_block_size(const EVP_MD *md)
-    const EVP_MD *EVP_get_digestbyname(const char *name)
 
     size_t hmac_ctx_size()
     void HMAC_CTX_init(HMAC_CTX *ctx);
@@ -60,8 +57,17 @@ cdef extern from "openssl/evp.h":
     int HMAC_Final(HMAC_CTX *ctx, unsigned char *md, unsigned int *len)
     void HMAC_CTX_cleanup(HMAC_CTX *ctx)
 
+    # The MD functions
+
     ctypedef struct EVP_MD_CTX:
         pass
+
+    ctypedef struct EVP_MD:
+        pass
+
+    int EVP_MD_size(const EVP_MD *md)
+    int EVP_MD_block_size(const EVP_MD *md)
+    const EVP_MD *EVP_get_digestbyname(const char *name)
 
     void EVP_MD_CTX_init(EVP_MD_CTX *ctx)
     int EVP_MD_CTX_cleanup(EVP_MD_CTX *ctx)
@@ -73,148 +79,116 @@ cdef extern from "openssl/evp.h":
     int EVP_DigestFinal_ex(EVP_MD_CTX *ctx, unsigned char *md, unsigned int *s);
     int EVP_Digest(const void *data, size_t count, unsigned char *md, unsigned int *size, const EVP_MD *type, ENGINE *impl)
 
-def hello():
-    return "Hello"
+
+cdef class crypto:
+
+    cdef EVP_CIPHER_CTX* ctx
+    cdef const EVP_CIPHER* cipher
+    cdef unsigned char* out
+    cdef unsigned out_len
+    cdef const EVP_MD* md
+    cdef EVP_MD_CTX* md_ctx
+
+    def __cinit__(self):
+        self.ctx = EVP_CIPHER_CTX_new()
+        self.cipher = EVP_get_cipherbyname("AES-128-CTR")
+        self.out = <unsigned char *> PyMem_Malloc(4096)
+        self.out_len = 4096
+
+        self.md = EVP_get_digestbyname("SHA256")
+        self.md_ctx = EVP_MD_CTX_create()
 
 
-def aes_ctr_c(key, msg, iv):
-    cdef EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new()
-    cdef const EVP_CIPHER* cipher = EVP_get_cipherbyname("AES-128-CTR")
-
-    cdef unsigned char * out = <unsigned char *> PyMem_Malloc(len(msg))
-    cdef int i;
-
-    EVP_CipherInit_ex(ctx, cipher, NULL, key, iv, 1)
-    EVP_CipherUpdate(ctx, out, &i, msg, len(msg))
-
-    py_out = out[:len(msg)]
-
-    PyMem_Free(out)
-    EVP_CIPHER_CTX_free(ctx)
-
-    return py_out
-
-"""
-
-/* 
-
-    EVP Ciphers 
-
-*/
-
-typedef struct evp_cipher_st
-{
-    int nid;
-    int block_size;
-    int key_len; /* Default value for variable length ciphers */
-    int iv_len;
-    unsigned long flags; /* Various flags */
-    ...;
-} EVP_CIPHER;
-
-typedef struct evp_cipher_ctx_st
-{
-    const EVP_CIPHER *cipher;
-    int encrypt; /* encrypt or decrypt */
-    int buf_len; /* number we have left */
-    int num; /* used by cfb/ofb/ctr mode */
-    int key_len; /* May change for variable length cipher */
-    unsigned long flags; /* Various flags */
-    int final_used;
-    int block_mask;
-    ...;
-} EVP_CIPHER_CTX;
-
-const EVP_CIPHER * EVP_aes_128_gcm(void);
-const EVP_CIPHER * EVP_aes_192_gcm(void);
-const EVP_CIPHER * EVP_aes_256_gcm(void);
-
-typedef ... ENGINE; // Ignore details of the engine.
-
-// Cipher context operations
-
-void EVP_CIPHER_CTX_init(EVP_CIPHER_CTX *a);
-int EVP_CIPHER_CTX_cleanup(EVP_CIPHER_CTX *a);
-EVP_CIPHER_CTX *EVP_CIPHER_CTX_new(void);
-void EVP_CIPHER_CTX_free(EVP_CIPHER_CTX *a);
-int EVP_CIPHER_CTX_set_key_length(EVP_CIPHER_CTX *x, int keylen);
-int EVP_CIPHER_CTX_set_padding(EVP_CIPHER_CTX *c, int pad);
-int EVP_CIPHER_CTX_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg, void *ptr);
-int EVP_CIPHER_CTX_rand_key(EVP_CIPHER_CTX *ctx, unsigned char *key);
-
-// Cipher operations
-
-const EVP_CIPHER *EVP_get_cipherbyname(const char *name);
-
-int  EVP_CipherInit_ex(EVP_CIPHER_CTX *ctx,const EVP_CIPHER *cipher, ENGINE *impl,
-const unsigned char *key,const unsigned char *iv, int enc);
-int  EVP_CipherUpdate(EVP_CIPHER_CTX *ctx, unsigned char *out,
-int *outl, const unsigned char *in, int inl);
-int  EVP_CipherFinal_ex(EVP_CIPHER_CTX *ctx, unsigned char *outm, int *outl);
-
-// The control codes for ciphers
-
-#define EVP_CTRL_INIT ...
-#define EVP_CTRL_SET_KEY_LENGTH ...
-#define EVP_CTRL_GET_RC2_KEY_BITS ...
-#define EVP_CTRL_SET_RC2_KEY_BITS ...
-#define EVP_CTRL_GET_RC5_ROUNDS ...
-#define EVP_CTRL_SET_RC5_ROUNDS ...
-#define EVP_CTRL_RAND_KEY ...
-#define EVP_CTRL_PBE_PRF_NID  ...
-#define EVP_CTRL_COPY ...
-#define EVP_CTRL_GCM_SET_IVLEN  ...
-#define EVP_CTRL_GCM_GET_TAG  ...
-#define EVP_CTRL_GCM_SET_TAG  ...
-#define EVP_CTRL_GCM_SET_IV_FIXED ...
-#define EVP_CTRL_GCM_IV_GEN ...
-#define EVP_CTRL_CCM_SET_IVLEN  ...
-#define EVP_CTRL_CCM_GET_TAG  ...
-#define EVP_CTRL_CCM_SET_TAG  ...
-#define EVP_CTRL_CCM_SET_L  ...
-#define EVP_CTRL_CCM_SET_MSGLEN ...
-#define EVP_CTRL_AEAD_TLS1_AAD  ...
-#define EVP_CTRL_AEAD_SET_MAC_KEY ...
-#define EVP_CTRL_GCM_SET_IV_INV ...
-
- int EVP_EncryptInit_ex(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *type,
-                 ENGINE *impl, unsigned char *key, unsigned char *iv);
- int EVP_EncryptUpdate(EVP_CIPHER_CTX *ctx, unsigned char *out,
-                 int *outl, unsigned char *in, int inl);
- int EVP_EncryptFinal_ex(EVP_CIPHER_CTX *ctx, unsigned char *out,
-                 int *outl);
-
- int EVP_DecryptInit_ex(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *type,
-                 ENGINE *impl, unsigned char *key, unsigned char *iv);
- int EVP_DecryptUpdate(EVP_CIPHER_CTX *ctx, unsigned char *out,
-                 int *outl, unsigned char *in, int inl);
- int EVP_DecryptFinal_ex(EVP_CIPHER_CTX *ctx, unsigned char *outm,
-                 int *outl);
-
-void init_ciphers();
-void cleanup_ciphers();
-
-// The HMAC interface
+    def __dalloc__(self):
+        PyMem_Free(self.out)
+        EVP_CIPHER_CTX_free(self.ctx)
+        EVP_MD_CTX_destroy(self.md_ctx)
 
 
-typedef struct { ...; } HMAC_CTX;
-typedef ... EVP_MD;
-
-size_t hmac_ctx_size();
-
-int EVP_MD_size(const EVP_MD *md);
-int EVP_MD_block_size(const EVP_MD *md);
-const EVP_MD *EVP_get_digestbyname(const char *name);
+    cdef ensure(self, unsigned int out_len):
+        if out_len > self.out_len:
+            PyMem_Free(self.out)
+            self.out = <unsigned char *> PyMem_Malloc(out_len)
+            self.out_len = out_len
 
 
- void HMAC_CTX_init(HMAC_CTX *ctx);
+    cpdef aes_ctr_c(self, const unsigned char * key, msg, const unsigned char* iv):
+        self.ensure(len(msg))
+        cdef int i;
 
- int HMAC_Init_ex(HMAC_CTX *ctx, const void *key, int key_len,
-                                     const EVP_MD *md, ENGINE *impl);
- int HMAC_Update(HMAC_CTX *ctx, const unsigned char *data, int len);
- int HMAC_Final(HMAC_CTX *ctx, unsigned char *md, unsigned int *len);
+        EVP_CipherInit_ex(self.ctx, self.cipher, NULL, key, iv, 1)
+        EVP_CipherUpdate(self.ctx, self.out, &i, msg, len(msg))
 
- void HMAC_CTX_cleanup(HMAC_CTX *ctx);
+        py_out = self.out[:len(msg)]
+        return py_out
 
 
-"""
+    cpdef hash(self, msg):
+        cdef unsigned int i;
+
+        cdef const char * s = msg
+
+        EVP_Digest(s, len(msg), self.out, &i, self.md, NULL)
+        return self.out[:i]
+
+
+    cpdef lioness_enc(self, k, key, message):
+        self.ensure(len(message))
+    
+        xshort =  message[:k]
+        xlong = message[k:]
+
+        cdef int i;
+
+        cdef unsigned char * out_short = self.out
+        cdef unsigned int short_len = 16
+        cdef unsigned char * out_long = self.out + 16
+        cdef unsigned int long_len = len(message) - 16
+        
+        cdef unsigned char d[32] 
+        cdef unsigned int s;
+
+
+        # Round 1
+
+        # k1 = self.hash(xlong+key+b'1')[:k]
+        EVP_DigestInit_ex(self.md_ctx, self.md, NULL)
+        EVP_DigestUpdate(self.md_ctx, <unsigned char *>xlong, len(xlong))
+        EVP_DigestUpdate(self.md_ctx, <unsigned char *>key, len(key))
+        EVP_DigestUpdate(self.md_ctx, '1', 1)
+        EVP_DigestFinal_ex(self.md_ctx, d, &s)
+
+        # xshort = self.aes_ctr_c(key, xshort, iv = d)
+        EVP_CipherInit_ex(self.ctx, self.cipher, NULL, key, d, 1)
+        EVP_CipherUpdate(self.ctx, out_short, &i, xshort, short_len)
+
+        
+        # Round 2
+
+        # xlong = self.aes_ctr_c(key, xlong, iv = xshort)
+        EVP_CipherInit_ex(self.ctx, self.cipher, NULL, key, out_short, 1)
+        EVP_CipherUpdate(self.ctx, out_long, &i, xlong, long_len)
+
+
+        # Round 3
+
+        # k3 = self.hash(xlong+key+b'3')[:k]
+        EVP_DigestInit_ex(self.md_ctx, self.md, NULL)
+        EVP_DigestUpdate(self.md_ctx, out_long, len(xlong))
+        EVP_DigestUpdate(self.md_ctx, <unsigned char *>key, len(key))
+        EVP_DigestUpdate(self.md_ctx, '3', 1)
+        EVP_DigestFinal_ex(self.md_ctx, d, &s)
+
+        # xshort = self.aes_ctr_c(key, xshort, iv = d)
+        EVP_CipherInit_ex(self.ctx, self.cipher, NULL, key, d, 1)
+        EVP_CipherUpdate(self.ctx, out_short, &i, out_short, short_len)
+
+
+        # Round 4
+
+        # xlong = self.aes_ctr_c(key, xlong, xshort)        
+        EVP_CipherInit_ex(self.ctx, self.cipher, NULL, key, out_short, 1)
+        EVP_CipherUpdate(self.ctx, out_long, &i, out_long, long_len)
+
+        r4 = self.out[:len(message)]
+        return r4
