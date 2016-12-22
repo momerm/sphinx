@@ -121,6 +121,9 @@ class SphinxParams:
     # The LIONESS PRP
 
     def aes_ctr(self, k, m, iv = b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"):
+        if self.crypto != None:
+            return bytes(self.crypto.aes_ctr_c(k, m, iv))
+        
         k = bytes(k)
         m = bytes(m)
         assert type(k) is bytes and type(m) is bytes
