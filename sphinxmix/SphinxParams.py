@@ -157,6 +157,10 @@ class SphinxParams:
         return r4
 
     def lioness_dec(self, key, message):
+        if self.crypto != None:
+            return self.crypto.lioness_dec(self.k, key, message)
+
+
         assert len(key) == self.k
         assert len(message) >= self.k * 2
 

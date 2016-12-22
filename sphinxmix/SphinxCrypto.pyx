@@ -192,3 +192,29 @@ cdef class crypto:
 
         r4 = self.out[:len(message)]
         return r4
+
+    cpdef lioness_dec(self, k, key, message):
+
+        r4 = message
+        r4_short, r4_long = r4[:k], r4[k:]
+
+        # Round 4        
+        r3_long = self.aes_ctr_c(key, r4_long, iv = r4_short)
+        r3_short = r4_short 
+
+        # Round 3
+        k2 = self.hash(r3_long+key+b'3')[:k]
+        r2_short = self.aes_ctr_c(key, r3_short, iv = k2)
+        r2_long = r3_long
+
+        # Round 2
+        r1_long = self.aes_ctr_c(key, r2_long, iv = r2_short)
+        r1_short = r2_short 
+
+        # Round 1
+        k0 = self.hash(r1_long+key+b'1')[:k]
+        c = self.aes_ctr_c(key, r1_short, iv = k0)
+        r0 = c + r1_long
+
+        return r0
+
