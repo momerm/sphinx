@@ -31,10 +31,14 @@ if __name__ == "__main__":
                   'sphinxmix': ['*.pyx'],
             },
 
-            setup_requires=['pytest-runner', "pytest", "Cython"],
+            setup_requires=[
+                  'pytest-runner >=2.0,<3dev', 
+                  "pytest >= 2.0.0", 
+                  "Cython"
+                  ],
             tests_require=[
                   "Cython",
-                  "pytest",
+                  "pytest >= 2.0.0",
                   "future >= 0.14.3",
                   "pytest >= 3.0.0",
                   "msgpack-python >= 0.4.6",
