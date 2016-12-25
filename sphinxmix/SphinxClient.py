@@ -268,6 +268,13 @@ def receive_surb(params, keytuple, delta):
     
     return msg
 
+def pack_message(params, m):
+    """ A method to pack mix messages. """
+    return encode(m)
+
+def unpack_message(params_dict, m):
+    """ A method to unpack mix messages. """
+    return decode(m)
 
 def test_timing():
     r = 5
@@ -296,6 +303,20 @@ def test_timing():
         header, delta = create_forward_message(params, nodes_routing, node_keys, b"dest", b"this is a test")
     t1 = time.time()
     print("Time per mix encoding: %.2fms" % ((t1-t0)*1000.0/100))
+
+    import time
+    t0 = time.time()
+    for _ in range(100):
+        packed = pack_message(params, (header, delta))
+    t1 = time.time()
+    print("Time per mix packing: %.2fms" % ((t1-t0)*1000.0/100))
+
+    import time
+    t0 = time.time()
+    for _ in range(100):
+        (header, delta) = unpack_message(params, packed)
+    t1 = time.time()
+    print("Time per mix unpacking: %.2fms" % ((t1-t0)*1000.0/100))
 
     from .SphinxNode import sphinx_process
     import time
