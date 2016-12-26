@@ -268,6 +268,13 @@ def receive_surb(params, keytuple, delta):
     
     return msg
 
+def pack_message(params, m):
+    """ A method to pack mix messages. """
+    return encode(m)
+
+def unpack_message(params_dict, m):
+    """ A method to unpack mix messages. """
+    return decode(m)
 
 def test_timing():
     r = 5
