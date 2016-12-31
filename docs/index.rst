@@ -6,6 +6,8 @@
 The sphinxmix package documentation
 ===================================
 
+This documentation relates to the `sphinxmix` package version |version|.
+
 Installing
 ----------
 
@@ -61,6 +63,13 @@ Client functions
 .. autofunction:: sphinxmix.SphinxClient.create_forward_message
 
 .. autofunction:: sphinxmix.SphinxClient.receive_forward
+
+Packaging messages
+------------------
+
+.. autofunction:: sphinxmix.SphinxClient.pack_message
+
+.. autofunction:: sphinxmix.SphinxClient.unpack_message
 
 Mix functions
 -------------

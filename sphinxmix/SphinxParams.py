@@ -204,7 +204,7 @@ class SphinxParams:
 
     def derive_key(self, k, flavor):
         iv = flavor
-        m = b"\x00" * 16
+        m = b"\x00" * self.k
         K = self.aes.enc(k, iv).update(m)
         return K
 

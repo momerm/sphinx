@@ -270,11 +270,14 @@ def receive_surb(params, keytuple, delta):
 
 def pack_message(params, m):
     """ A method to pack mix messages. """
-    return encode(m)
+    return encode(((params.max_len, params.m), m))
 
 def unpack_message(params_dict, m):
     """ A method to unpack mix messages. """
-    return decode(m)
+    lens, msg = decode(m)
+    if tuple(lens) not in params_dict:
+        raise SphinxException("No parameter settings for: %s" % lens)
+    return params_dict[tuple(lens)], msg
 
 def test_timing():
     r = 5
@@ -338,6 +341,16 @@ def test_minimal():
     dest = b"bob"
     message = b"this is a test"
     header, delta = create_forward_message(params, nodes_routing, node_keys, dest, message)
+
+    # Test encoding and decoding
+
+    bin_message = pack_message(params, (header, delta))
+    param_dict = { (params.max_len, params.m):params }
+
+    px, (header1, delta1) = unpack_message(param_dict, bin_message)
+    assert px == params
+    assert header == tuple(header1)
+    assert delta == delta1
 
     # Process message by the sequence of mixes
     from .SphinxNode import sphinx_process

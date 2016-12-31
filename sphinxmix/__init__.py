@@ -156,11 +156,23 @@ it to implement more complex mixing strategies:
     ...         break
 
 
+Packaging mix messages to byte strings:
+---------------------------------------
+
+The `sphinxmix` package provides functions `pack_message` and `unpack_message` to 
+serialize and deserialize mix messages using `msgpack`. Some meta-data about the 
+parameter length are passed along the message any may be used to select an appropriate
+parameter environment for the decoding of the message.
+
+    >>> from sphinxmix.SphinxClient import pack_message, unpack_message
+    >>> bin_message = pack_message(params, (header, delta))
+    >>> param_dict = { (params.max_len, params.m):params }
+    >>> px, (header1, delta1) = unpack_message(param_dict, bin_message)
 
 
 """
 
-VERSION = "0.0.4"
+VERSION = "0.0.6"
 
 class SphinxException(Exception):
     pass
