@@ -18,9 +18,6 @@
 # License along with Sphinx.  If not, see
 # <http://www.gnu.org/licenses/>.
 
-from os import urandom
-from struct import unpack
-from binascii import hexlify
 
 # Python 2/3 compatibility
 from builtins import bytes
@@ -28,15 +25,19 @@ from builtins import bytes
 from . import SphinxException
 
 # Core Process function -- devoid of any chrome
-def sphinx_process(params, secret, header, delta):
+def sphinx_process(params, secret, header, delta, assoc=b''):
     """ The heart of a Sphinx server, that processes incoming messages.
     It takes a set of parameters, the secret of the server,
-    and an incoming message header and body.
+    and an incoming message header and body. Optinally some Associated
+    data may also be passed in to check their integrity.
         
     """
     p = params
     group = p.group
     alpha, beta, gamma = header
+
+    if params.assoc_len != len(assoc):
+        raise SphinxException("Associated data length mismatch: expected %s and got %s." % (params.assoc_len, len(assoc)))
 
     # Check that alpha is in the group
     if not group.in_group(alpha):
@@ -47,8 +48,7 @@ def sphinx_process(params, secret, header, delta):
     aes_s = p.get_aes_key(s)
     
     assert len(beta) == p.max_len - 32
-    # print("B: \n%s" % hexlify(beta))
-    if gamma != p.mu(p.hmu(aes_s), beta):
+    if gamma != p.mu(p.hmu(aes_s), assoc + beta):
         raise SphinxException("MAC mismatch.")
 
     beta_pad = beta + (b"\x00" * (2 * p.max_len)) 

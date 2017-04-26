@@ -22,7 +22,7 @@
 from os import urandom
 from collections import namedtuple
 from struct import pack
-from binascii import hexlify
+
 from petlib.pack import encode, decode
 
 # Python 2/3 compatibility
@@ -108,11 +108,18 @@ def rand_subset(lst, nu):
     return list(map(lambda x:x[1], nodeids[:nu]))
 
 
-def create_header(params, nodelist, keys, dest):
-    """ Internal function, creating a Sphinx header, given parameters, a node list (path), 
-    a pki mapping node names to keys, a destination, and a message identifier.""" 
+def create_header(params, nodelist, keys, dest, assoc=None):
+    """ Internal function, creating a Sphinx header.""" 
 
     node_meta = [pack("b", len(n)) + n for n in nodelist]
+    if params.assoc_len > 0:
+        assoc = assoc
+    else:
+        assoc = [b''] * len(nodelist)
+
+    assert len(assoc) == len(nodelist)
+    for assoc_data in assoc:
+        assert len(assoc_data) == params.assoc_len
 
     p = params
     nu = len(nodelist)
@@ -163,7 +170,8 @@ def create_header(params, nodelist, keys, dest):
     beta = final_routing + urandom(random_pad_len)
     beta = p.xor_rho(p.hrho(asbtuples[nu-1].aes), beta) + phi
 
-    gamma = p.mu(p.hmu(asbtuples[nu-1].aes), beta)
+    # Compute the MAC over the associated data and beta
+    gamma = p.mu(p.hmu(asbtuples[nu-1].aes), assoc[nu-1] + beta)
     
     for i in range(nu-2, -1, -1):
         node_id = node_meta[i+1]
@@ -173,17 +181,17 @@ def create_header(params, nodelist, keys, dest):
         plain = node_id + gamma + beta[:plain_beta_len]
         
         beta = p.xor_rho(p.hrho(asbtuples[i].aes), plain)        
-        gamma = p.mu(p.hmu(asbtuples[i].aes), beta)
+        gamma = p.mu(p.hmu(asbtuples[i].aes), assoc[i] + beta)
         
     return (asbtuples[0].alpha, beta, gamma), \
         [x.aes for x in asbtuples]
 
 
-def create_forward_message(params, nodelist, keys, dest, msg):
+def create_forward_message(params, nodelist, keys, dest, msg, assoc=None):
     """Creates a forward Sphix message, ready to be processed by a first mix. 
 
     It takes as parameters a node list of mix information, that will be provided to each mix, forming the path of the message;
-    a list of public keys of all intermediate mixes; a destination and a message (byte arrays)."""
+    a list of public keys of all intermediate mixes; a destination and a message; and optinally an array of associated data (byte arrays)."""
 
     p = params
     # pki = p.pki
@@ -194,7 +202,7 @@ def create_forward_message(params, nodelist, keys, dest, msg):
     # Compute the header and the secrets
 
     final = Route_pack((Dest_flag, ))
-    header, secrets = create_header(params, nodelist, keys, final)
+    header, secrets = create_header(params, nodelist, keys, final, assoc)
 
     body = pad_body(p.m, (b"\x00" * p.k) + encode((dest, msg)))
 
@@ -205,10 +213,11 @@ def create_forward_message(params, nodelist, keys, dest, msg):
 
     return header, delta
 
-def create_surb(params, nodelist, keys, dest):
+def create_surb(params, nodelist, keys, dest, assoc=None):
     """Creates a Sphinx single use reply block (SURB) using a set of parameters;
     a sequence of mix identifiers; a pki mapping names of mixes to keys; and a final 
-    destination.
+    destination. An array of associated data, for each mix on the path, may optionally
+    be passed in.
 
     Returns:
         - A triplet (surbid, surbkeytuple, nymtuple). Where the surbid can be 
@@ -222,7 +231,7 @@ def create_surb(params, nodelist, keys, dest):
 
     # Compute the header and the secrets
     final = Route_pack((Surb_flag, dest, xid))
-    header, secrets = create_header(params, nodelist, keys, final )
+    header, secrets = create_header(params, nodelist, keys, final, assoc )
 
     ktilde = urandom(p.k)
     keytuple = [ktilde]
@@ -409,6 +418,51 @@ def test_minimal():
 
     received = receive_surb(params, surbkeytuple, delta)
     assert received == message
+
+def test_assoc(rep=100, payload_size=1024):
+    r = 5
+    params = SphinxParams(body_len=payload_size, assoc_len=4)
+    pki = {}
+    
+    pkiPriv = {}
+    pkiPub = {}
+
+    for i in range(10):
+        nid = pack("b", i)
+        x = params.group.gensecret()
+        y = params.group.expon(params.group.g, x)
+        pkiPriv[nid] = pki_entry(nid, x, y)
+        pkiPub[nid] = pki_entry(nid, None, y)
+
+
+    # The simplest path selection algorithm and message packaging
+    use_nodes = rand_subset(pkiPub.keys(), r)
+    nodes_routing = list(map(Nenc, use_nodes))
+    node_keys = [pkiPub[n].y for n in use_nodes]
+    print()
+
+    assoc = [b"XXXX"] * len(nodes_routing)
+    
+    import time
+    t0 = time.time()
+    for _ in range(rep):
+        header, delta = create_forward_message(params, nodes_routing, node_keys, b"dest", b"this is a test", assoc)
+    t1 = time.time()
+    print("Time per mix encoding: %.2fms" % ((t1-t0)*1000.0/rep))
+    T_package = (t1-t0)/rep
+
+    from .SphinxNode import sphinx_process
+    import time
+    t0 = time.time()
+    for _ in range(rep):
+        x = pkiPriv[use_nodes[0]].x
+        sphinx_process(params, x, header, delta, b"XXXX")
+    t1 = time.time()
+    print("Time per mix processing: %.2fms" % ((t1-t0)*1000.0/rep))
+    T_process = (t1-t0)/rep
+
+    return T_package, T_process
+
 
 if __name__ == "__main__":
     test_timing() 

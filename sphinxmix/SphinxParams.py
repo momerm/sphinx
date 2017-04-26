@@ -94,10 +94,11 @@ def test_params():
 
 class SphinxParams:
 
-    def __init__(self, group=None, header_len = 192, body_len = 1024):
+    def __init__(self, group=None, header_len = 192, body_len = 1024, assoc_len=0):
         # self.r = r
         self.aes = Cipher("AES-128-CTR")
 
+        self.assoc_len = assoc_len
         self.max_len = header_len
         self.m = body_len
         self.k = 16
