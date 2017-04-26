@@ -172,7 +172,7 @@ parameter environment for the decoding of the message.
 
 """
 
-VERSION = "0.0.6"
+VERSION = "0.0.7"
 
 class SphinxException(Exception):
     pass

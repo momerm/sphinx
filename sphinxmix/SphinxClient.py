@@ -279,9 +279,9 @@ def unpack_message(params_dict, m):
         raise SphinxException("No parameter settings for: %s" % lens)
     return params_dict[tuple(lens)], msg
 
-def test_timing():
+def test_timing(rep=100, payload_size=1024):
     r = 5
-    params = SphinxParams()
+    params = SphinxParams(body_len=payload_size)
     pki = {}
     
     pkiPriv = {}
@@ -302,19 +302,23 @@ def test_timing():
     
     import time
     t0 = time.time()
-    for _ in range(100):
+    for _ in range(rep):
         header, delta = create_forward_message(params, nodes_routing, node_keys, b"dest", b"this is a test")
     t1 = time.time()
-    print("Time per mix encoding: %.2fms" % ((t1-t0)*1000.0/100))
+    print("Time per mix encoding: %.2fms" % ((t1-t0)*1000.0/rep))
+    T_package = (t1-t0)/rep
 
     from .SphinxNode import sphinx_process
     import time
     t0 = time.time()
-    for _ in range(100):
+    for _ in range(rep):
         x = pkiPriv[use_nodes[0]].x
         sphinx_process(params, x, header, delta)
     t1 = time.time()
-    print("Time per mix processing: %.2fms" % ((t1-t0)*1000.0/100))
+    print("Time per mix processing: %.2fms" % ((t1-t0)*1000.0/rep))
+    T_process = (t1-t0)/rep
+
+    return T_package, T_process
 
 
 def test_minimal():
