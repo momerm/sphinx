@@ -69,13 +69,13 @@ by the sequence of mixes.
     >>> x = pkiPriv[use_nodes[0]].x
     >>> while True:
     ...     ret = sphinx_process(params, x, header, delta)
-    ...     (tag, info, (header, delta)) = ret
+    ...     (tag, info, (header, delta), mac_key) = ret
     ...     routing = PFdecode(params, info)
     ...     if routing[0] == Relay_flag:
     ...         flag, addr = routing
     ...         x = pkiPriv[addr].x 
     ...     elif routing[0] == Dest_flag:
-    ...         assert receive_forward(params, delta) == [dest, message]
+    ...         assert receive_forward(params, mac_key, delta) == [dest, message]
     ...         break
 
 It is the responsibility of a mix to record ``tags`` of messages to prevent 
@@ -105,7 +105,7 @@ by the last mix in the path:
     >>> x = pkiPriv[use_nodes[0]].x
     >>> while True:
     ...    ret = sphinx_process(params, x, header, delta)
-    ...    (tag, B, (header, delta)) = ret
+    ...    (tag, B, (header, delta), mac_key) = ret
     ...    routing = PFdecode(params, B)
     ...
     ...    if routing[0] == Relay_flag:
@@ -143,14 +143,14 @@ it to implement more complex mixing strategies:
     >>> x = pkiPriv[use_nodes[0]].x
     >>> while True:
     ...     ret = sphinx_process(params, x, header, delta)
-    ...     (tag, info, (header, delta)) = ret
+    ...     (tag, info, (header, delta), mac_key) = ret
     ...     routing = PFdecode(params, info)
     ...     if routing[0] == Relay_flag:
     ...         flag, (addr, additional_info) = routing
     ...         assert additional_info == b'info'
     ...         x = pkiPriv[addr].x 
     ...     elif routing[0] == Dest_flag:
-    ...         [[dest, additional_info], msg] = receive_forward(params, delta)
+    ...         [[dest, additional_info], msg] = receive_forward(params, mac_key, delta)
     ...         assert additional_info == b'final_info'
     ...         assert dest == b'bob'
     ...         break

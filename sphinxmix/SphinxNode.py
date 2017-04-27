@@ -65,6 +65,7 @@ def sphinx_process(params, secret, header, delta, assoc=b''):
     beta = rest[p.k:p.k+(p.max_len - 32)]
     delta = p.pii(p.hpi(aes_s), delta)
 
-    ret = (tag, routing, ((alpha, beta, gamma), delta))
+    mac_key = p.hpi(aes_s)
+    ret = (tag, routing, ((alpha, beta, gamma), delta), mac_key)
     return ret
 

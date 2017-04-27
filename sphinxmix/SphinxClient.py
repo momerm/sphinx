@@ -206,7 +206,10 @@ def create_forward_message(params, nodelist, keys, dest, msg, assoc=None):
     final = Route_pack((Dest_flag, ))
     header, secrets = create_header(params, nodelist, keys, final, assoc)
 
-    body = pad_body(p.m, (b"\x00" * p.k) + encode((dest, msg)))
+
+    payload = pad_body(p.m - p.k, encode((dest, msg)))
+    mac = p.mu(p.hpi(secrets[nu-1]), payload)
+    body =  mac + payload
 
     # Compute the delta values
     delta = p.pi(p.hpi(secrets[nu-1]), body)
@@ -247,14 +250,17 @@ def package_surb(params, nymtuple, message):
     Returns a header and a body to pass to the first mix.
     """
     n0, header0, ktilde = nymtuple
-    body = params.pi(ktilde, pad_body(params.m, (b"\x00" * params.k) + message))
+
+    message = pad_body(params.m - params.k, message)
+    mac = params.mu(ktilde, message)
+    body = params.pi(ktilde, mac + message )
     return (header0, body)
 
 
-def receive_forward(params, delta):
+def receive_forward(params, mac_key, delta):
     """ Decodes the body of a forward message."""
     
-    if delta[:params.k] != b"\x00" * params.k:
+    if delta[:params.k] != params.mu(mac_key, delta[params.k:]):
         raise SphinxException("Modified Body")
 
     delta = unpad_body(delta[params.k:])
@@ -274,8 +280,10 @@ def receive_surb(params, keytuple, delta):
         delta = p.pi(keytuple[i], delta)
     delta = p.pii(ktilde, delta)
 
-    if delta[:p.k] == (b"\x00" * p.k):
+    if delta[:p.k] == p.mu(ktilde, delta[p.k:]):
         msg = unpad_body(delta[p.k:])
+    else:
+        raise SphinxException("Modified SURB Body")
     
     return msg
 
@@ -375,7 +383,7 @@ def test_minimal():
     while True:
 
         ret = sphinx_process(params, x, header, delta)
-        (tag, B, (header, delta)) = ret
+        (tag, B, (header, delta), mac_key) = ret
         routing = PFdecode(params, B)
 
         print("round %d" % i)
@@ -387,8 +395,8 @@ def test_minimal():
             x = pkiPriv[addr].x 
         elif routing[0] == Dest_flag:
             assert len(routing) == 1
-            assert delta[:16] == b"\x00" * params.k
-            dec_dest, dec_msg = receive_forward(params, delta)
+            # assert delta[:16] == b"\x00" * params.k
+            dec_dest, dec_msg = receive_forward(params, mac_key, delta)
             assert dec_dest == dest
             assert dec_msg == message
 
@@ -408,7 +416,7 @@ def test_minimal():
 
     while True:
         ret = sphinx_process(params, x, header, delta)
-        (tag, B, (header, delta)) = ret
+        (tag, B, (header, delta), mac_key) = ret
         routing = PFdecode(params, B)
 
         if routing[0] == Relay_flag:
