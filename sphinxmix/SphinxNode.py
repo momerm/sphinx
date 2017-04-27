@@ -44,7 +44,7 @@ def sphinx_process(params, secret, header, delta, assoc=b''):
         raise SphinxException("Alpha not in Group.")
 
     # Compute the shared secret
-    s = group.expon(alpha, secret)
+    s = group.expon(alpha, [ secret ])
     aes_s = p.get_aes_key(s)
     
     assert len(beta) == p.max_len - 32
@@ -60,7 +60,7 @@ def sphinx_process(params, secret, header, delta, assoc=b''):
 
     tag = p.htau(aes_s)
     b = p.hb(alpha, aes_s)
-    alpha = group.expon(alpha, b)
+    alpha = group.expon(alpha, [ b ])
     gamma = rest[:p.k]
     beta = rest[p.k:p.k+(p.max_len - 32)]
     delta = p.pii(p.hpi(aes_s), delta)

@@ -2,3 +2,4 @@ future>=0.14.3
 pytest>=2.5.0
 msgpack-python>=0.4.6
 petlib>=0.0.38
+pynacl>=1.1.0

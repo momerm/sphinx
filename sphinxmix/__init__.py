@@ -32,7 +32,7 @@ keys (derived using ``expon``).
     >>> for i in range(10):
     ...     nid = i
     ...     x = params.group.gensecret()
-    ...     y = params.group.expon(params.group.g, x)
+    ...     y = params.group.expon(params.group.g, [ x ])
     ...     pkiPriv[nid] = pki_entry(nid, x, y)
     ...     pkiPub[nid] = pki_entry(nid, None, y)
 

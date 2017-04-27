@@ -45,15 +45,17 @@ class Group_ECC:
         return self.G.order().random()
 
     def expon(self, base, exp):        
-        x = exp
+        x = exp[0]
+        for f in exp[1:]:
+            x = x.mod_mul(f, self.G.order())
         b = base
         return (x * b)
 
-    def multiexpon(self, base, exps):
-        expon = 1
-        for e in exps:
-            expon = e.mod_mul( expon, self.G.order())
-        return (expon * base)
+    def expon_base(self, exp):        
+        x = exp[0]
+        for f in exp[1:]:
+            x = x.mod_mul(f, self.G.order())
+        return (x * self.g)
 
     def makeexp(self, data):
         return (Bn.from_binary(data) % self.G.order())
@@ -72,9 +74,8 @@ def test_group():
     sec2 = G.gensecret();
     gen = G.g
 
-    assert G.expon(G.expon(gen, sec1), sec2) == G.expon(G.expon(gen, sec2), sec1)
-    assert G.expon(G.expon(gen, sec1), sec2) == G.multiexpon(gen, [sec2, sec1])
-    assert G.in_group(G.expon(gen, sec1))
+    assert G.expon(G.expon(gen, [ sec1 ]), [ sec2 ]) == G.expon(G.expon(gen, [ sec2 ]), [ sec1 ])
+    assert G.in_group(G.expon(gen, [ sec1 ]))
 
 def test_params():
     # Test Init
@@ -88,20 +89,20 @@ def test_params():
     m2 = params.lioness_dec(k, c)
     assert m == m2
 
+    # Test CTR
     k = urandom(16)
     c = params.aes_ctr(k, b"Hello World!")
     assert params.aes_ctr(k, c) == b"Hello World!"
 
 class SphinxParams:
 
-    def __init__(self, group=None, header_len = 192, body_len = 1024, assoc_len=0):
-        # self.r = r
+    def __init__(self, group=None, header_len = 192, body_len = 1024, assoc_len=0, k=16):
         self.aes = Cipher("AES-128-CTR")
 
         self.assoc_len = assoc_len
         self.max_len = header_len
         self.m = body_len
-        self.k = 16
+        self.k = k
 
         self.group = group
         if not group:
@@ -109,7 +110,6 @@ class SphinxParams:
 
 
     # The LIONESS PRP
-
     def aes_ctr(self, k, m, iv = b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"):
         k = bytes(k)
         m = bytes(m)
@@ -168,10 +168,9 @@ class SphinxParams:
 
         return r0
 
-
+    # AES-CTR operation
     def xor_rho(self, key, plain):
-        assert len(key) == self.k
-        # p = b"\x00" * other
+        assert len(key) == self.k        
         return self.aes_ctr(key, plain)
 
 
@@ -195,7 +194,6 @@ class SphinxParams:
         return self.lioness_dec(key, data)
 
     # The various hashes
-
     def hash(self, data):
         return sha256(data).digest()
 

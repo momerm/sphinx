@@ -112,6 +112,7 @@ def create_header(params, nodelist, keys, dest, assoc=None):
     """ Internal function, creating a Sphinx header.""" 
 
     node_meta = [pack("b", len(n)) + n for n in nodelist]
+    
     if params.assoc_len > 0:
         assoc = assoc
     else:
@@ -128,16 +129,17 @@ def create_header(params, nodelist, keys, dest, assoc=None):
     group = p.group
     x = group.gensecret()
 
-    blind_factor = x
+    blind_factors = [ x ]
     asbtuples = []
     
     for k in keys:
-        alpha = group.expon(group.g, blind_factor)
-        s = group.expon(k, blind_factor)
+        alpha = group.expon_base(blind_factors)
+        s = group.expon(k, blind_factors)
         aes_s = p.get_aes_key(s)
 
         b = p.hb(alpha, aes_s)
-        blind_factor = blind_factor.mod_mul(b, p.group.G.order())
+        # blind_factor = blind_factor.mod_mul(b, p.group.G.order())
+        blind_factors += [ b ] 
 
         hr = header_record(alpha, s, b, aes_s)
         asbtuples.append(hr)
@@ -299,7 +301,7 @@ def test_timing(rep=100, payload_size=1024):
     for i in range(10):
         nid = pack("b", i)
         x = params.group.gensecret()
-        y = params.group.expon(params.group.g, x)
+        y = params.group.expon(params.group.g, [ x ])
         pkiPriv[nid] = pki_entry(nid, x, y)
         pkiPub[nid] = pki_entry(nid, None, y)
 
@@ -343,7 +345,7 @@ def test_minimal():
     for i in range(10):
         nid = pack("b", i) # Nenc(params, bytes([i]))
         x = params.group.gensecret()
-        y = params.group.expon(params.group.g, x)
+        y = params.group.expon(params.group.g, [ x ])
         pkiPriv[nid] = pki_entry(nid, x, y)
         pkiPub[nid] = pki_entry(nid, None, y)
 
@@ -430,7 +432,7 @@ def test_assoc(rep=100, payload_size=1024):
     for i in range(10):
         nid = pack("b", i)
         x = params.group.gensecret()
-        y = params.group.expon(params.group.g, x)
+        y = params.group.expon(params.group.g, [ x ])
         pkiPriv[nid] = pki_entry(nid, x, y)
         pkiPub[nid] = pki_entry(nid, None, y)
 
@@ -462,6 +464,57 @@ def test_assoc(rep=100, payload_size=1024):
     T_process = (t1-t0)/rep
 
     return T_package, T_process
+
+from nacl.bindings import crypto_scalarmult_base, crypto_scalarmult
+
+def test_c25519(rep=100, payload_size=1024):
+    r = 5
+    from .SphinxParamsC25519 import Group_C25519
+    
+    group = Group_C25519()
+    params = SphinxParams(group=group, body_len=payload_size, assoc_len=4)
+    pki = {}
+    
+    pkiPriv = {}
+    pkiPub = {}
+
+    for i in range(10):
+        nid = pack("b", i)
+        x = params.group.gensecret()
+        y = crypto_scalarmult_base(x)
+        pkiPriv[nid] = pki_entry(nid, x, y)
+        pkiPub[nid] = pki_entry(nid, None, y)
+
+
+    # The simplest path selection algorithm and message packaging
+    use_nodes = rand_subset(pkiPub.keys(), r)
+    nodes_routing = list(map(Nenc, use_nodes))
+    node_keys = [pkiPub[n].y for n in use_nodes]
+    print()
+
+    assoc = [b"XXXX"] * len(nodes_routing)
+    
+    import time
+    t0 = time.time()
+    for _ in range(rep):
+        header, delta = create_forward_message(params, nodes_routing, node_keys, b"dest", b"this is a test", assoc)
+    t1 = time.time()
+    print("Time per mix encoding: %.2fms" % ((t1-t0)*1000.0/rep))
+    T_package = (t1-t0)/rep
+
+    from .SphinxNode import sphinx_process
+    import time
+    t0 = time.time()
+    for _ in range(rep):
+        x = pkiPriv[use_nodes[0]].x
+        sphinx_process(params, x, header, delta, b"XXXX")
+    t1 = time.time()
+    print("Time per mix processing: %.2fms" % ((t1-t0)*1000.0/rep))
+    T_process = (t1-t0)/rep
+
+    return T_package, T_process
+
+
 
 
 if __name__ == "__main__":
