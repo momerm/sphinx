@@ -481,6 +481,12 @@ def test_c25519(rep=100, payload_size=1024):
     
     group = Group_C25519()
     params = SphinxParams(group=group, body_len=payload_size, assoc_len=4)
+
+    # Monkey patch to use AES-CTR
+    params.lioness_enc = params.xor_rho
+    params.lioness_dec = params.xor_rho
+
+
     pki = {}
     
     pkiPriv = {}
