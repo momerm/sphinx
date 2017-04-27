@@ -298,7 +298,7 @@ def unpack_message(params_dict, m):
         raise SphinxException("No parameter settings for: %s" % lens)
     return params_dict[tuple(lens)], msg
 
-def test_timing(rep=100, payload_size=1024):
+def test_timing(rep=100, payload_size=1024 * 10):
     r = 5
     params = SphinxParams(body_len=payload_size)
     pki = {}
@@ -429,7 +429,7 @@ def test_minimal():
     received = receive_surb(params, surbkeytuple, delta)
     assert received == message
 
-def test_assoc(rep=100, payload_size=1024):
+def test_assoc(rep=100, payload_size=1024 * 10):
     r = 5
     params = SphinxParams(body_len=payload_size, assoc_len=4)
     pki = {}
@@ -475,7 +475,7 @@ def test_assoc(rep=100, payload_size=1024):
 
 from nacl.bindings import crypto_scalarmult_base, crypto_scalarmult
 
-def test_c25519(rep=100, payload_size=1024):
+def test_c25519(rep=100, payload_size=1024 * 10):
     r = 5
     from .SphinxParamsC25519 import Group_C25519
     
