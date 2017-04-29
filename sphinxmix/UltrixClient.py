@@ -33,80 +33,10 @@ from .SphinxParams import SphinxParams
 from . import SphinxException
 
 
-# FLAGS
-
-#: Routing flag indicating message is to be relayed.
-Relay_flag = "\xF0"
-
-#: Routing flag indicating message is to be delivered.
-Dest_flag = "\xF1"
-
-#: Routing flag indicating surb reply is to be delivered.
-Surb_flag = "\xF2"
-
-# Padding/unpadding of message bodies: a 0 bit, followed by as many 1
-# bits as it takes to fill it up
-
-header_record = namedtuple("header_record", ["alpha", "s", "b", "aes"])
-
-#: A helper named tuple to store PKI information.
-pki_entry = namedtuple("pki_entry", ["id", "x", "y"])
-
-
-def pad_body(msgtotalsize, body):
-    """ Unpad the Sphinx message body."""
-    body = body + b"\x7f"
-    body = body + (b"\xff" * (msgtotalsize - len(body)))
-
-    if (msgtotalsize - len(body)) < 0:
-        raise SphinxException("Insufficient space for body") 
-
-    return body
-
-def unpad_body(body):
-    """ Pad a Sphinx message body. """
-    body = bytes(body)
-    l = len(body) - 1
-    x_marker = bytes(b"\x7f")[0]
-    f_marker = bytes(b"\xff")[0]
-    while body[l] == f_marker and l > 0:
-        l -= 1
-    
-    if body[l] == x_marker:
-        ret = body[:l]
-    else:
-        ret = b''
-    
-    return ret
-
-# Prefix-free encoding/decoding of node names and destinations
-
-# Sphinx nodes
-def Nenc(idnum):
-    """ The encoding of mix names. """
-    return Route_pack((Relay_flag, idnum))
-
-def Route_pack(info):
-    return encode(info)
-
-# Decode the prefix-free encoding.  Return the type, value, and the
-# remainder of the input string
-def PFdecode(param, packed):
-    """ Decoder of prefix free encoder for commands received by mix or clients."""
-    assert type(packed) is bytes
-    return decode(packed)
-
-
-def rand_subset(lst, nu):
-    """Return a list of nu random elements of the given list (without
-    replacement)."""
-
-    # Randomize the order of the list by sorting on a random key
-    nodeids = [(urandom(8),x) for x in lst]
-    nodeids.sort(key=lambda x:x[0])
-
-    # Return the first nu elements of the randomized list
-    return list(map(lambda x:x[1], nodeids[:nu]))
+from .SphinxClient import Relay_flag, Dest_flag, Surb_flag, header_record, pki_entry
+from .SphinxClient import pad_body, unpad_body
+from .SphinxClient import Nenc, Route_pack, PFdecode, rand_subset
+from .SphinxClient import pack_message, unpack_message
 
 
 def create_header(params, nodelist, keys, dest, assoc=None, secrets = None, gamma=None):
@@ -295,16 +225,6 @@ def receive_surb(params, keytuple, delta):
     
     return msg
 
-def pack_message(params, m):
-    """ A method to pack mix messages. """
-    return encode(((params.max_len, params.m), m))
-
-def unpack_message(params_dict, m):
-    """ A method to unpack mix messages. """
-    lens, msg = decode(m)
-    if tuple(lens) not in params_dict:
-        raise SphinxException("No parameter settings for: %s" % lens)
-    return params_dict[tuple(lens)], msg
 
 # TESTS
 
