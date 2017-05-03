@@ -117,7 +117,9 @@ def create_header(params, nodelist, keys, dest, assoc=None, secrets = None, gamm
         plain = node_id + beta[:plain_beta_len]
         beta = p.xor_rho(p.hrho(asbtuples[i].aes), plain)
         beta_all = [ beta ] + beta_all
-    
+
+    # Compute the cummulative MAC.
+
     original_gamma = gamma
     new_keys = []
     for beta_i, k in zip(beta_all, asbtuples):
@@ -143,7 +145,6 @@ def create_forward_message(params, nodelist, keys, dest, msg, assoc=None):
 
     final = Route_pack((Dest_flag, ))
     header, secrets = create_header(params, nodelist, keys, final, assoc)
-
 
     payload = pad_body(p.m - p.k, encode((dest, msg)))
     mac = p.mu(p.hpi(secrets[nu-1]), payload)
