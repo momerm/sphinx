@@ -94,6 +94,10 @@ def test_params():
     c = params.aes_ctr(k, b"Hello World!")
     assert params.aes_ctr(k, c) == b"Hello World!"
 
+    c = params.small_perm(b"\x00"*16, b"\x00"*16)
+    c2 = params.small_perm_inv(b"\x00"*16, c)
+    assert c2 == b"\x00"*16
+
 class SphinxParams:
 
     def __init__(self, group=None, header_len = 192, body_len = 1024, assoc_len=0, k=16):
@@ -192,6 +196,22 @@ class SphinxParams:
         assert len(data) == self.m
 
         return self.lioness_dec(key, data)
+
+    def small_perm(self, key, data):
+        assert len(data) == self.k
+        aes = Cipher("AES-128-ECB")
+        enc = aes.enc(key, None)
+        c = enc.update(data)
+        c += enc.finalize()
+        return c
+
+    def small_perm_inv(self, key, data):
+        assert len(data) == self.k
+        aes = Cipher("AES-128-ECB")
+        enc = aes.dec(key, None)
+        c = enc.update(data)
+        c += enc.finalize()
+        return c
 
     # The various hashes
     def hash(self, data):

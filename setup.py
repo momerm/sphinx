@@ -23,14 +23,14 @@ if __name__ == "__main__":
                   "future >= 0.14.3",
                   "pytest >= 3.0.0",
                   "msgpack-python >= 0.4.6",
-                  "petlib >= 0.0.38",
+                  "petlib >= 0.0.41",
                   "pynacl >= 1.1.0",
             ],
             install_requires=[
                   "future >= 0.14.3",
                   "pytest >= 3.0.0",
                   "msgpack-python >= 0.4.6",
-                  "petlib >= 0.0.38",
+                  "petlib >= 0.0.41",
                   "pynacl >= 1.1.0",
             ]
       )

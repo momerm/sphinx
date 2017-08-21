@@ -39,7 +39,7 @@ from .SphinxClient import Nenc, Route_pack, PFdecode, rand_subset
 from .SphinxClient import pack_message, unpack_message
 
 
-def create_header(params, nodelist, keys, dest, assoc=None, secrets = None, gamma=None):
+def create_header(params, nodelist, keys, dest, assoc=None, secrets = None, gamma=None, dest_key = None):
     """ Internal function, creating a Sphinx header.""" 
 
     node_meta = [pack("b", len(n)) + n for n in nodelist]
@@ -67,6 +67,9 @@ def create_header(params, nodelist, keys, dest, assoc=None, secrets = None, gamm
 
     if not gamma:
         gamma = urandom(16)
+
+    if not dest_key:
+        dest_key = urandom(p.k)
 
     asbtuples = []
     
@@ -119,12 +122,14 @@ def create_header(params, nodelist, keys, dest, assoc=None, secrets = None, gamm
         beta_all = [ beta ] + beta_all
 
     # Compute the cummulative MAC.
-
     original_gamma = gamma
     new_keys = []
     for beta_i, k in zip(beta_all, asbtuples):
         gamma = p.mu(p.hmu(k.aes), gamma + beta_i)
         new_keys += [p.derive_key(k.aes, gamma)]
+
+    # Encrypt the dest key
+    
 
     return (asbtuples[0].alpha, beta, original_gamma), new_keys
         
