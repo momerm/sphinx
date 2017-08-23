@@ -201,6 +201,7 @@ class SphinxParams:
         assert len(data) == self.k
         aes = Cipher("AES-128-ECB")
         enc = aes.enc(key, None)
+        enc.set_padding(False)
         c = enc.update(data)
         c += enc.finalize()
         return c
@@ -209,6 +210,7 @@ class SphinxParams:
         assert len(data) == self.k
         aes = Cipher("AES-128-ECB")
         enc = aes.dec(key, None)
+        enc.set_padding(False)
         c = enc.update(data)
         c += enc.finalize()
         return c
