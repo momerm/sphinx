@@ -43,7 +43,8 @@ def create_header(params, nodelist, keys, dest, assoc=None, secrets = None, gamm
     """ Internal function, creating a Ultrix header.""" 
 
     node_meta = [pack("b", len(n)) + n for n in nodelist]
-    
+    final_routing = pack("b", len(dest)) + dest
+
     if params.assoc_len > 0:
         assoc = assoc
     else:
@@ -100,7 +101,6 @@ def create_header(params, nodelist, keys, dest, assoc=None, secrets = None, gamm
     # Compute the (beta, gamma) tuples
     # The os.urandom used to be a string of 0x00 bytes, but that's wrong
     
-    final_routing = pack("b", len(dest)) + dest
 
     len_meta = sum(map(len, node_meta[1:]))
     random_pad_len = (max_len - 32) - len_meta - len(final_routing)
@@ -147,22 +147,24 @@ def create_forward_message(params, nodelist, keys, dest, msg, assoc=None):
     a list of public keys of all intermediate mixes; a destination and a message; and optinally an array of associated data (byte arrays)."""
 
     p = params
-    # pki = p.pki
     nu = len(nodelist)
     assert 0 < len(dest) < 128
     assert p.k + 1 + len(dest) + len(msg) < p.m
 
     # Compute the header and the secrets
 
+    dest_key = urandom(16)
+
     final = Route_pack((Dest_flag, ))
-    header, secrets = create_header(params, nodelist, keys, final, assoc)
+    header, secrets = create_header(params, nodelist, keys, final, assoc, dest_key = dest_key)
 
     payload = pad_body(p.m - p.k, encode((dest, msg)))
     mac = p.mu(p.hpi(secrets[nu-1]), payload)
     body =  mac + payload
 
     # Compute the delta values
-    delta = p.xor_rho(p.hpi(secrets[nu-1]), body)
+    delta = p.pi(dest_key, body)
+    delta = p.xor_rho(p.hpi(secrets[nu-1]), delta)
     for i in range(nu-2, -1, -1):
         delta = p.xor_rho(p.hpi(secrets[i]), delta)
 
@@ -207,9 +209,13 @@ def package_surb(params, nymtuple, message):
     return (header0, body)
 
 
-def receive_forward(params, mac_key, delta):
+def receive_forward(params, header, mac_key, delta):
     """ Decodes the body of a forward message, and checks its MAC tag."""
     
+    _,_,_, dest_key = header
+
+    delta = params.pii(dest_key, delta)
+
     if delta[:params.k] != params.mu(mac_key, delta[params.k:]):
         raise SphinxException("Modified Body")
 
@@ -344,7 +350,7 @@ def test_minimal_ultrix():
         elif routing[0] == Dest_flag:
             assert len(routing) == 1
             # assert delta[:16] == b"\x00" * params.k
-            dec_dest, dec_msg = receive_forward(params, mac_key, delta)
+            dec_dest, dec_msg = receive_forward(params, header, mac_key, delta)
             assert dec_dest == dest
             assert dec_msg == message
 
