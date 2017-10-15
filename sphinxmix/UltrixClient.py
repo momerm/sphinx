@@ -191,7 +191,7 @@ def create_surb(params, nodelist, keys, dest, assoc=None):
     xid = urandom(p.k)
 
     # Compute the header and the secrets
-    final = [ Route_pack((Surb_flag, dest, xid)) ]
+    final = [ Route_pack((Surb_flag, dest)) ]
     header, secrets = create_header(params, nodelist + final, keys, assoc, dest_key = xid )
 
     ktilde = urandom(p.k)
@@ -381,7 +381,10 @@ def test_minimal_ultrix():
             flag, addr = routing
             x = pkiPriv[addr].x 
         elif routing[0] == Surb_flag:
-            flag, dest, myid = routing
+            assert routing[1] == b"myself"
+            flag, dest = routing
+            myid = header[-1]
+            assert myid == surbid
             break
 
     received = receive_surb(params, surbkeytuple, delta)
