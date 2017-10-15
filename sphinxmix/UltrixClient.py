@@ -44,6 +44,7 @@ def create_header(params, nodelist, keys, dest, assoc=None, secrets = None, gamm
 
     node_meta = [pack("b", len(n)) + n for n in nodelist]
     final_routing = pack("b", len(dest)) + dest
+    node_meta = node_meta + final_routing
 
     if params.assoc_len > 0:
         assoc = assoc
