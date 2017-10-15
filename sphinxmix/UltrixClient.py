@@ -39,12 +39,11 @@ from .SphinxClient import Nenc, Route_pack, PFdecode, rand_subset
 from .SphinxClient import pack_message, unpack_message
 
 
-def create_header(params, nodelist, keys, dest, assoc=None, secrets = None, gamma=None, dest_key = None):
+def create_header(params, nodelist, keys, assoc=None, secrets = None, gamma=None, dest_key = None):
     """ Internal function, creating a Ultrix header.""" 
 
     node_meta = [pack("b", len(n)) + n for n in nodelist]
-    final_routing = pack("b", len(dest)) + dest
-    node_meta = node_meta + final_routing
+    nodelist = nodelist[:-1]
 
     if params.assoc_len > 0:
         assoc = assoc
@@ -97,30 +96,33 @@ def create_header(params, nodelist, keys, dest, assoc=None, secrets = None, gamm
 
         min_len -= len(node_meta[i])        
     
-    assert len(phi) == sum(map(len, node_meta[1:]))
+    assert len(phi) == sum(map(len, node_meta[1:-1]))
 
     # Compute the (beta, gamma) tuples
     # The os.urandom used to be a string of 0x00 bytes, but that's wrong
     
 
     len_meta = sum(map(len, node_meta[1:]))
-    random_pad_len = (max_len - 32) - len_meta - len(final_routing)
-    p
+    random_pad_len = (max_len - 32) - len_meta
+    
     if random_pad_len < 0:
         raise SphinxException("Insufficient space routing info: missing %s bytes" % (abs(random_pad_len))) 
 
-    beta = final_routing + urandom(random_pad_len)
+    beta = node_meta[-1] + urandom(random_pad_len)
     beta = p.xor_rho(p.hrho(asbtuples[nu-1].aes), beta) + phi
-    
+
     beta_all = [ beta ]
     for i in range(nu-2, -1, -1):
+        assert len(beta) == (max_len - 32)
         node_id = node_meta[i+1]
 
         plain_beta_len = (max_len - 32) - len(node_id)
+
         
         plain = node_id + beta[:plain_beta_len]
         beta = p.xor_rho(p.hrho(asbtuples[i].aes), plain)
         beta_all = [ beta ] + beta_all
+        assert len(beta) == (max_len - 32)
 
     # Compute the cummulative MAC.
     gamma_K = []
@@ -136,8 +138,9 @@ def create_header(params, nodelist, keys, dest, assoc=None, secrets = None, gamm
     # Encrypt the dest key
     assert len(gamma_K) == len(asbtuples)
     for gK in reversed(gamma_K):
-    	dest_key = p.small_perm_inv(gK, dest_key)
+        dest_key = p.small_perm_inv(gK, dest_key)
 
+    assert len(beta) == (max_len - 32)
     return (asbtuples[0].alpha, beta, original_gamma, dest_key), new_keys
         
 
@@ -156,8 +159,8 @@ def create_forward_message(params, nodelist, keys, dest, msg, assoc=None):
 
     dest_key = urandom(16)
 
-    final = Route_pack((Dest_flag, ))
-    header, secrets = create_header(params, nodelist, keys, final, assoc, dest_key = dest_key)
+    final = [ Route_pack((Dest_flag, )) ]
+    header, secrets = create_header(params, nodelist + final, keys, assoc, dest_key = dest_key)
 
     payload = pad_body(p.m - p.k, encode((dest, msg)))
     mac = p.mu(p.hpi(secrets[nu-1]), payload)
@@ -188,8 +191,8 @@ def create_surb(params, nodelist, keys, dest, assoc=None):
     xid = urandom(p.k)
 
     # Compute the header and the secrets
-    final = Route_pack((Surb_flag, dest, xid))
-    header, secrets = create_header(params, nodelist, keys, final, assoc )
+    final = [ Route_pack((Surb_flag, dest, xid)) ]
+    header, secrets = create_header(params, nodelist + final, keys, assoc )
 
     ktilde = urandom(p.k)
     keytuple = [ktilde]
