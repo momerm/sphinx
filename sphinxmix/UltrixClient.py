@@ -40,7 +40,7 @@ from .SphinxClient import pack_message, unpack_message
 
 
 def create_header(params, nodelist, keys, dest, assoc=None, secrets = None, gamma=None, dest_key = None):
-    """ Internal function, creating a Sphinx header.""" 
+    """ Internal function, creating a Ultrix header.""" 
 
     node_meta = [pack("b", len(n)) + n for n in nodelist]
     
@@ -58,7 +58,7 @@ def create_header(params, nodelist, keys, dest, assoc=None, secrets = None, gamm
     max_len = p.max_len
     group = p.group
     
-    # Accept external secrets too.
+    # Accept external secrets too -- derandomize 
     if not secrets:
         x = group.gensecret()
         blind_factors = [ x ]
@@ -122,16 +122,22 @@ def create_header(params, nodelist, keys, dest, assoc=None, secrets = None, gamm
         beta_all = [ beta ] + beta_all
 
     # Compute the cummulative MAC.
+    gamma_K = []
+
     original_gamma = gamma
     new_keys = []
     for beta_i, k in zip(beta_all, asbtuples):
         gamma = p.mu(p.hmu(k.aes), gamma + beta_i)
+        gamma2 = p.mu(p.hmu(k.aes), b"XXX"+gamma + beta_i)
+        gamma_K += [ gamma2 ]
         new_keys += [p.derive_key(k.aes, gamma)]
 
     # Encrypt the dest key
-    
+    assert len(gamma_K) == len(asbtuples)
+    for gK in reversed(gamma_K):
+    	dest_key = p.small_perm_inv(gK, dest_key)
 
-    return (asbtuples[0].alpha, beta, original_gamma), new_keys
+    return (asbtuples[0].alpha, beta, original_gamma, dest_key), new_keys
         
 
 def create_forward_message(params, nodelist, keys, dest, msg, assoc=None):
@@ -143,7 +149,7 @@ def create_forward_message(params, nodelist, keys, dest, msg, assoc=None):
     p = params
     # pki = p.pki
     nu = len(nodelist)
-    assert len(dest) < 128 and len(dest) > 0
+    assert 0 < len(dest) < 128
     assert p.k + 1 + len(dest) + len(msg) < p.m
 
     # Compute the header and the secrets
@@ -156,14 +162,14 @@ def create_forward_message(params, nodelist, keys, dest, msg, assoc=None):
     body =  mac + payload
 
     # Compute the delta values
-    delta = p.pi(p.hpi(secrets[nu-1]), body)
+    delta = p.xor_rho(p.hpi(secrets[nu-1]), body)
     for i in range(nu-2, -1, -1):
-        delta = p.pi(p.hpi(secrets[i]), delta)
+        delta = p.xor_rho(p.hpi(secrets[i]), delta)
 
     return header, delta
 
 def create_surb(params, nodelist, keys, dest, assoc=None):
-    """Creates a Sphinx single use reply block (SURB) using a set of parameters;
+    """Creates a Ultrix single use reply block (SURB) using a set of parameters;
     a sequence of mix identifiers; a pki mapping names of mixes to keys; and a final 
     destination. An array of associated data, for each mix on the path, may optionally
     be passed in.
@@ -197,7 +203,7 @@ def package_surb(params, nymtuple, message):
 
     message = pad_body(params.m - params.k, message)
     mac = params.mu(ktilde, message)
-    body = params.pi(ktilde, mac + message )
+    body = params.xor_rho(ktilde, mac + message )
     return (header0, body)
 
 
@@ -221,8 +227,8 @@ def receive_surb(params, keytuple, delta):
     ktilde = keytuple.pop(0)
     nu = len(keytuple)
     for i in range(nu-1, -1, -1):
-        delta = p.pi(keytuple[i], delta)
-    delta = p.pii(ktilde, delta)
+        delta = p.xor_rho(keytuple[i], delta)
+    delta = p.xor_rho(ktilde, delta)
 
     if delta[:p.k] == p.mu(ktilde, delta[p.k:]):
         msg = unpad_body(delta[p.k:])

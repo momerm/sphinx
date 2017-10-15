@@ -26,7 +26,7 @@ from . import SphinxException
 
 # Core Process function -- devoid of any chrome
 def ultrix_process(params, secret, header, delta, assoc=b''):
-    """ The heart of a Sphinx server, that processes incoming messages.
+    """ The heart of a Ultrix server, that processes incoming messages.
     It takes a set of parameters, the secret of the server,
     and an incoming message header and body. Optinally some Associated
     data may also be passed in to check their integrity.
@@ -34,7 +34,7 @@ def ultrix_process(params, secret, header, delta, assoc=b''):
     """
     p = params
     group = p.group
-    alpha, beta, gamma = header
+    alpha, beta, gamma, dest_key = header
     original_beta = beta
 
     if params.assoc_len != len(assoc):
@@ -49,9 +49,7 @@ def ultrix_process(params, secret, header, delta, assoc=b''):
     aes_s = p.get_aes_key(s)
     
     assert len(beta) == p.max_len - 32
-    #if gamma != p.mu(p.hmu(aes_s), assoc + beta):
-    #    raise SphinxException("MAC mismatch.")
-
+    
     beta_pad = beta + (b"\x00" * (2 * p.max_len)) 
     B = p.xor_rho(p.hrho(aes_s), beta_pad)
 
@@ -65,10 +63,13 @@ def ultrix_process(params, secret, header, delta, assoc=b''):
     beta = rest[:(p.max_len - 32)]
 
     gamma = p.mu(p.hmu(aes_s), gamma + original_beta)
+    gamma2 = p.mu(p.hmu(aes_s), b"XXX"+gamma + original_beta)
     K = p.derive_key(aes_s, gamma)
-    delta = p.pii(p.hpi(K), delta)
+    # delta = p.pii(p.hpi(K), delta)
+    dest_key = p.small_perm(gamma2, dest_key)
+    delta = p.xor_rho(p.hpi(K), delta)
 
     mac_key = p.hpi(K)
-    ret = (tag, routing, ((alpha, beta, gamma), delta), mac_key)
+    ret = (tag, routing, ((alpha, beta, gamma, dest_key), delta), mac_key)
     return ret
 
