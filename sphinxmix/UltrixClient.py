@@ -192,7 +192,7 @@ def create_surb(params, nodelist, keys, dest, assoc=None):
 
     # Compute the header and the secrets
     final = [ Route_pack((Surb_flag, dest, xid)) ]
-    header, secrets = create_header(params, nodelist + final, keys, assoc )
+    header, secrets = create_header(params, nodelist + final, keys, assoc, dest_key = xid )
 
     ktilde = urandom(p.k)
     keytuple = [ktilde]
