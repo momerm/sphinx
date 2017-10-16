@@ -244,6 +244,12 @@ class SphinxParams:
         K = self.derive_key(k, b"hmu:hmu:hmu:hmu:")
         return K
 
+    def hmu2(self, k):
+        "Compute a hash of s to use as a key for the permutation mu2"
+        K = self.derive_key(k, b"hmu2:hmu2:hmu2:h")
+        return K
+
+
     def hpi(self, k):
         "Compute a hash of s to use as a key for the PRP pi"
         K = self.derive_key(k, b"hpi:hpi:hpi:hpi:")
