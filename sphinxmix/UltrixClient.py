@@ -116,7 +116,6 @@ def create_header(params, nodelist, keys, assoc=None, secrets = None, gamma=None
 
         plain_beta_len = (max_len - 32) - len(node_id)
 
-        
         plain = node_id + beta[:plain_beta_len]
         beta = p.xor_rho(p.hrho(asbtuples[i].aes), plain)
         beta_all = [ beta ] + beta_all
@@ -270,6 +269,7 @@ def decode_surb(params, header, enc_dest):
 
 from nacl.bindings import crypto_scalarmult_base, crypto_scalarmult
 
+
 def test_ultrix_c25519(rep=100, payload_size=1024 * 10):
     r = 5
     from .SphinxParamsC25519 import Group_C25519
@@ -408,7 +408,3 @@ def test_minimal_ultrix():
 
     received = receive_surb(params, surbkeytuple, delta)
     assert received == message
-
-
-if __name__ == "__main__":
-    test_c25519() 
