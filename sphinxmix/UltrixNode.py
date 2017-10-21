@@ -62,11 +62,11 @@ def ultrix_process(params, secret, header, delta, assoc=b''):
     alpha = group.expon(alpha, [ b ])
     beta = rest[:(p.max_len - 32)]
 
-    x_gamma = gamma
-    gamma = p.mu(p.hmu(aes_s), original_beta)
-    gamma2 = p.mu(p.hmu2(aes_s), original_beta)
+    xgamma = gamma
+    gamma = p.mu(p.hmu(aes_s), xgamma + original_beta)
+    gamma2 = p.mu(p.hmu2(aes_s), xgamma + original_beta)
     K = p.derive_key(aes_s, gamma)
-    # delta = p.pii(p.hpi(K), delta)
+    
     dest_key = p.small_perm(gamma2, dest_key)
     delta = p.xor_rho(p.hpi(K), delta)
 

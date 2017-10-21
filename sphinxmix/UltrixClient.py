@@ -128,9 +128,9 @@ def create_header(params, nodelist, keys, assoc=None, secrets = None, gamma=None
     original_gamma = gamma
     new_keys = []
     for beta_i, k in zip(beta_all, asbtuples):
-        x_gamma = gamma
-        gamma = p.mu(p.hmu(k.aes), beta_i)
-        gamma2 = p.mu(p.hmu2(k.aes), beta_i)
+        xgamma = gamma
+        gamma = p.mu(p.hmu(k.aes), xgamma + beta_i)
+        gamma2 = p.mu(p.hmu2(k.aes), xgamma + beta_i)
         gamma_K += [ gamma2 ]
         new_keys += [p.derive_key(k.aes, gamma)]
 
@@ -140,7 +140,7 @@ def create_header(params, nodelist, keys, assoc=None, secrets = None, gamma=None
         dest_key = p.small_perm_inv(gK, dest_key)
 
     assert len(beta) == (max_len - 32)
-    return (asbtuples[0].alpha, beta, gamma, dest_key), new_keys
+    return (asbtuples[0].alpha, beta, original_gamma, dest_key), new_keys
         
 
 def create_forward_message(params, nodelist, keys, dest, msg, assoc=None):
