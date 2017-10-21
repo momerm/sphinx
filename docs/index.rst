@@ -43,8 +43,10 @@ Core classes and functions
 
 .. autoclass:: sphinxmix.SphinxParams.Group_ECC
 
-Client functions
-----------------
+.. autoclass:: sphinxmix.SphinxParamsC25519.Group_C25519
+
+Utility functions
+-----------------
 
 .. autofunction:: sphinxmix.SphinxClient.pki_entry
 
@@ -59,6 +61,9 @@ Client functions
 .. autofunction:: sphinxmix.SphinxClient.PFdecode
 
 .. autofunction:: sphinxmix.SphinxClient.rand_subset
+
+Client functions
+----------------
     
 .. autofunction:: sphinxmix.SphinxClient.create_forward_message
 
@@ -84,6 +89,33 @@ SURB functions
 .. autofunction:: sphinxmix.SphinxClient.package_surb
 
 .. autofunction:: sphinxmix.SphinxClient.receive_surb
+
+
+Ultrix Format
+=============
+
+Mix functions
+-------------
+
+.. autofunction:: sphinxmix.UltrixNode.ultrix_process
+
+Client functions
+----------------
+    
+.. autofunction:: sphinxmix.UltrixClient.create_forward_message
+
+.. autofunction:: sphinxmix.UltrixClient.receive_forward
+
+SURB functions
+--------------
+
+.. autofunction:: sphinxmix.UltrixClient.create_surb
+
+.. autofunction:: sphinxmix.UltrixClient.package_surb
+
+.. autofunction:: sphinxmix.UltrixClient.decode_surb
+
+.. autofunction:: sphinxmix.UltrixClient.receive_surb
 
 
 Indices and tables

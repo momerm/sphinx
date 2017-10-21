@@ -37,11 +37,9 @@ from builtins import bytes
 from nacl.bindings import crypto_scalarmult_base, crypto_scalarmult
 
 class Group_C25519:
-    "Group operations in ECC"
+    "Group operations using Curve 25519"
 
-    def __init__(self, gid=713):
-        # self.G = EcGroup(gid)
-        # self.g = self.G.generator()
+    def __init__(self):
         pass
 
     def gensecret(self):

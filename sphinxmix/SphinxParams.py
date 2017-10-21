@@ -98,15 +98,22 @@ def test_params():
     c2 = params.small_perm_inv(b"\x00"*16, c)
     assert c2 == b"\x00"*16
 
+    plain = b"Bob"
+    k = urandom(16)
+    c = params.aes_ctr(k, plain)
+    p = params.aes_ctr(k, c)
+    assert p == b"Bob"
+
 class SphinxParams:
 
-    def __init__(self, group=None, header_len = 192, body_len = 1024, assoc_len=0, k=16):
+    def __init__(self, group=None, header_len = 192, body_len = 1024, assoc_len=0, k=16, dest_len=16):
         self.aes = Cipher("AES-128-CTR")
 
         self.assoc_len = assoc_len
         self.max_len = header_len
         self.m = body_len
         self.k = k
+        self.dest_len = dest_len
 
         self.group = group
         if not group:
@@ -224,6 +231,7 @@ class SphinxParams:
         return self.hash(b"aes_key:" + group.printable(s))[:self.k]
 
     def derive_key(self, k, flavor):
+        assert len(k) == len(flavor) == self.k
         iv = flavor
         m = b"\x00" * self.k
         K = self.aes.enc(k, iv).update(m)

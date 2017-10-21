@@ -99,8 +99,6 @@ def create_header(params, nodelist, keys, assoc=None, secrets = None, gamma=None
     assert len(phi) == sum(map(len, node_meta[1:-1]))
 
     # Compute the (beta, gamma) tuples
-    # The os.urandom used to be a string of 0x00 bytes, but that's wrong
-    
 
     len_meta = sum(map(len, node_meta[1:]))
     random_pad_len = (max_len - 32) - len_meta
@@ -151,24 +149,30 @@ def create_forward_message(params, nodelist, keys, dest, msg, assoc=None):
     It takes as parameters a node list of mix information, that will be provided to each mix, forming the path of the message;
     a list of public keys of all intermediate mixes; a destination and a message; and optinally an array of associated data (byte arrays)."""
 
+    assert len(dest) <= params.dest_len
+
     p = params
     nu = len(nodelist)
     assert 0 < len(dest) < 128
     assert p.k + 1 + len(dest) + len(msg) < p.m
 
     # Compute the header and the secrets
-
     dest_key = urandom(16)
+    dest_inner_key = params.derive_key(dest_key, b"dest_inner______")
+    body_inner_key = params.derive_key(dest_key, b"body_inner______")
 
-    final = [ Route_pack((Dest_flag, )) ]
+    enc_dest = p.xor_rho(dest_inner_key, dest)
+    assert len(enc_dest) == len(dest)
+
+    final = [ Route_pack((Dest_flag, enc_dest)) ]
     header, secrets = create_header(params, nodelist + final, keys, assoc, dest_key = dest_key)
 
-    payload = pad_body(p.m - p.k, encode((dest, msg)))
+    payload = pad_body(p.m - p.k, encode(msg))
     mac = p.mu(p.hpi(secrets[nu-1]), payload)
     body =  mac + payload
 
     # Compute the delta values
-    delta = p.pi(dest_key, body)
+    delta = p.pi(body_inner_key, body)
     delta = p.xor_rho(p.hpi(secrets[nu-1]), delta)
     for i in range(nu-2, -1, -1):
         delta = p.xor_rho(p.hpi(secrets[i]), delta)
@@ -192,7 +196,10 @@ def create_surb(params, nodelist, keys, dest, assoc=None):
     xid = urandom(p.k)
 
     # Compute the header and the secrets
-    final = [ Route_pack((Surb_flag, dest)) ]
+
+    enc_dest = params.xor_rho(xid, dest)
+
+    final = [ Route_pack((Surb_flag, enc_dest)) ]
     header, secrets = create_header(params, nodelist + final, keys, assoc, dest_key = xid )
 
     ktilde = urandom(p.k)
@@ -214,18 +221,23 @@ def package_surb(params, nymtuple, message):
     return (header0, body)
 
 
-def receive_forward(params, header, mac_key, delta):
+def receive_forward(params, header, mac_key, routing, delta):
     """ Decodes the body of a forward message, and checks its MAC tag."""
     
     _, _, _, dest_key = header
+    _, dest = routing
 
-    delta = params.pii(dest_key, delta)
+    dest_inner_key = params.derive_key(dest_key, b"dest_inner______")
+    body_inner_key = params.derive_key(dest_key, b"body_inner______")
+
+    dest = params.xor_rho(dest_inner_key, dest)
+    delta = params.pii(body_inner_key, delta)
 
     if delta[:params.k] != params.mu(mac_key, delta[params.k:]):
         raise SphinxException("Modified Body")
 
     delta = unpad_body(delta[params.k:])
-    return decode(delta)
+    return dest, decode(delta)
 
 def receive_surb(params, keytuple, delta): 
     """Processes a SURB body to extract the reply. The keytuple was provided at the time of 
@@ -248,6 +260,11 @@ def receive_surb(params, keytuple, delta):
     
     return msg
 
+def decode_surb(params, header, enc_dest):
+    """ Decode the destination address of the SURB. """
+    (_, _, _, xid) = header
+    dest = params.xor_rho(xid, enc_dest)
+    return dest    
 
 # TESTS
 
@@ -353,9 +370,9 @@ def test_minimal_ultrix():
             addr = routing[1]
             x = pkiPriv[addr].x 
         elif routing[0] == Dest_flag:
-            assert len(routing) == 1
+            assert len(routing) == 2
             # assert delta[:16] == b"\x00" * params.k
-            dec_dest, dec_msg = receive_forward(params, header, mac_key, delta)
+            dec_dest, dec_msg = receive_forward(params, header, mac_key, routing, delta)
             assert dec_dest == dest
             assert dec_msg == message
 
@@ -382,8 +399,9 @@ def test_minimal_ultrix():
             flag, addr = routing
             x = pkiPriv[addr].x 
         elif routing[0] == Surb_flag:
-            assert routing[1] == b"myself"
             flag, dest = routing
+            dest = decode_surb(params, header, dest)
+            assert dest == b"myself"            
             myid = header[-1]
             assert myid == surbid
             break
