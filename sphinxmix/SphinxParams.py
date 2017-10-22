@@ -267,3 +267,13 @@ class SphinxParams:
         "Compute a hash of s to use to see if we've seen s before"
         K = self.derive_key(k, b"htauhtauhtauhtau")
         return K
+
+    def h_body_K(self, k):
+        "The Ultrix key to protect the user data."
+        K = self.derive_key(k, b"UbodUbodUbodUbod")
+        return K
+
+    def h_root_K(self, k):
+        "The Ultrix key to protect the root key."
+        K = self.derive_key(k, b"UrooUrooUrooUroo")
+        return K

@@ -63,14 +63,14 @@ def ultrix_process(params, secret, header, delta, assoc=b''):
     beta = rest[:(p.max_len - 32)]
 
     xgamma = gamma
-    gamma = p.mu(p.hmu(aes_s), xgamma + original_beta)
-    gamma2 = p.mu(p.hmu2(aes_s), xgamma + original_beta)
-    K = p.derive_key(aes_s, gamma)
+    round_mac_key = p.hmu(aes_s)
+    gamma = p.mu(round_mac_key, b"G1" + xgamma + original_beta)
+    root_K = p.mu(round_mac_key, b"G2" + gamma)
+    body_K = p.mu(round_mac_key, b"G3" + gamma)
     
-    dest_key = p.small_perm(gamma2, dest_key)
-    delta = p.xor_rho(p.hpi(K), delta)
+    dest_key = p.small_perm(root_K, dest_key)
+    delta = p.xor_rho(body_K, delta)
 
-    mac_key = p.hpi(K)
-    ret = (tag, routing, ((alpha, beta, gamma, dest_key), delta), mac_key)
+    ret = (tag, routing, ((alpha, beta, gamma, dest_key), delta), body_K)
     return ret
 

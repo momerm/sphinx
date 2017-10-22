@@ -42,29 +42,26 @@ from .SphinxClient import pack_message, unpack_message
 def create_header(params, nodelist, keys, assoc=None, secrets = None, gamma=None, dest_key = None):
     """ Internal function, creating a Ultrix header.""" 
 
-    node_meta = [pack("b", len(n)) + n for n in nodelist]
-    nodelist = nodelist[:-1]
+    p = params
+    max_len = p.max_len
+    group = p.group
 
-    if params.assoc_len > 0:
-        assoc = assoc
-    else:
+    node_meta = [pack("b", len(n)) + n for n in nodelist]
+    nodelist = nodelist[:-1] # remove the final destination.
+    nu = len(nodelist)
+
+    if not params.assoc_len > 0:
         assoc = [b''] * len(nodelist)
 
     assert len(assoc) == len(nodelist)
     for assoc_data in assoc:
         assert len(assoc_data) == params.assoc_len
-
-    p = params
-    nu = len(nodelist)
-    max_len = p.max_len
-    group = p.group
     
     # Accept external secrets too -- derandomize 
+    blind_factors = secrets
     if not secrets:
         x = group.gensecret()
         blind_factors = [ x ]
-    else: 
-        blind_factors = secrets
 
     if not gamma:
         gamma = urandom(16)
@@ -99,7 +96,6 @@ def create_header(params, nodelist, keys, assoc=None, secrets = None, gamma=None
     assert len(phi) == sum(map(len, node_meta[1:-1]))
 
     # Compute the (beta, gamma) tuples
-
     len_meta = sum(map(len, node_meta[1:]))
     random_pad_len = (max_len - 32) - len_meta
     
@@ -122,20 +118,23 @@ def create_header(params, nodelist, keys, assoc=None, secrets = None, gamma=None
         assert len(beta) == (max_len - 32)
 
     # Compute the cummulative MAC.
-    gamma_K = []
 
     original_gamma = gamma
+    root_keys = []
     new_keys = []
     for beta_i, k in zip(beta_all, asbtuples):
         xgamma = gamma
-        gamma = p.mu(p.hmu(k.aes), xgamma + beta_i)
-        gamma2 = p.mu(p.hmu2(k.aes), xgamma + beta_i)
-        gamma_K += [ gamma2 ]
-        new_keys += [p.derive_key(k.aes, gamma)]
+        round_mac_key = p.hmu(k.aes)
+        gamma = p.mu(round_mac_key, b"G1" + xgamma + beta_i)
+        root_K = p.mu(round_mac_key, b"G2" + gamma)
+        body_K = p.mu(round_mac_key, b"G3" + gamma)
+
+        root_keys += [ root_K ]
+        new_keys += [ body_K ]
 
     # Encrypt the dest key
-    assert len(gamma_K) == len(asbtuples)
-    for gK in reversed(gamma_K):
+    assert len(root_keys) == len(asbtuples)
+    for gK in reversed(root_keys):
         dest_key = p.small_perm_inv(gK, dest_key)
 
     assert len(beta) == (max_len - 32)
@@ -167,14 +166,14 @@ def create_forward_message(params, nodelist, keys, dest, msg, assoc=None):
     header, secrets = create_header(params, nodelist + final, keys, assoc, dest_key = dest_key)
 
     payload = pad_body(p.m - p.k, encode(msg))
-    mac = p.mu(p.hpi(secrets[nu-1]), payload)
+    mac = p.mu(secrets[nu-1], payload)
     body =  mac + payload
 
     # Compute the delta values
     delta = p.pi(body_inner_key, body)
-    delta = p.xor_rho(p.hpi(secrets[nu-1]), delta)
+    delta = p.xor_rho(secrets[nu-1], delta)
     for i in range(nu-2, -1, -1):
-        delta = p.xor_rho(p.hpi(secrets[i]), delta)
+        delta = p.xor_rho(secrets[i], delta)
 
     return header, delta
 
@@ -203,7 +202,7 @@ def create_surb(params, nodelist, keys, dest, assoc=None):
 
     ktilde = urandom(p.k)
     keytuple = [ktilde]
-    keytuple.extend(map(p.hpi, secrets))
+    keytuple.extend( secrets)
     return xid, keytuple, (nodelist[0], header, ktilde)
 
 def package_surb(params, nymtuple, message):
@@ -269,6 +268,42 @@ def decode_surb(params, header, enc_dest):
 
 from nacl.bindings import crypto_scalarmult_base, crypto_scalarmult
 
+def profile_ultrix_c25519(rep=100, payload_size=1024 * 10):
+    r = 5
+    from .SphinxParamsC25519 import Group_C25519
+    
+    group = Group_C25519()
+    params = SphinxParams(group=group, header_len = 32+50, body_len=payload_size, assoc_len=4)
+
+    pkiPriv = {}
+    pkiPub = {}
+
+    for i in range(10):
+        nid = pack("b", i)
+        x = params.group.gensecret()
+        y = crypto_scalarmult_base(x)
+        pkiPriv[nid] = pki_entry(nid, x, y)
+        pkiPub[nid] = pki_entry(nid, None, y)
+
+
+    # The simplest path selection algorithm and message packaging
+    use_nodes = rand_subset(pkiPub.keys(), r)
+    nodes_routing = list(map(Nenc, use_nodes))
+    node_keys = [pkiPub[n].y for n in use_nodes]
+    print()
+
+    assoc = [b"XXXX"] * len(nodes_routing)
+    header, delta = create_forward_message(params, nodes_routing, node_keys, b"dest", b"this is a test", assoc)
+    
+    from .UltrixNode import ultrix_process
+    import time
+    t0 = time.time()
+    for _ in range(rep):
+        x = pkiPriv[use_nodes[0]].x
+        ultrix_process(params, x, header, delta, b"XXXX")
+    t1 = time.time()
+    print("Time per mix processing: %.2fms" % ((t1-t0)*1000.0/rep))
+    T_process = (t1-t0)/rep
 
 def test_ultrix_c25519(rep=100, payload_size=1024 * 10):
     r = 5
