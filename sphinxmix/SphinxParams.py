@@ -230,6 +230,16 @@ class SphinxParams:
         group = self.group
         return self.hash(b"aes_key:" + group.printable(s))[:self.k]
 
+    def get_aes_key_all(self, s):
+        group = self.group
+        k = self.hash(b"aes_key:" + group.printable(s))[:self.k]
+
+        num = 3 # (hrho, hmu, htau)
+        iv = b"UltrUltrUltrUltr"
+        material = self.aes.enc(k, iv).update(b"\x00" * self.k * num)
+
+        return k, [material[self.k*i:self.k*(i+1)] for i in range(num)]
+
     def derive_key(self, k, flavor):
         assert len(k) == len(flavor) == self.k
         iv = flavor
@@ -252,10 +262,10 @@ class SphinxParams:
         K = self.derive_key(k, b"hmu:hmu:hmu:hmu:")
         return K
 
-    def hmu2(self, k):
-        "Compute a hash of s to use as a key for the permutation mu2"
-        K = self.derive_key(k, b"hmu2:hmu2:hmu2:h")
-        return K
+    # def hmu2(self, k):
+    #    "Compute a hash of s to use as a key for the permutation mu2"
+    #    K = self.derive_key(k, b"hmu2:hmu2:hmu2:h")
+    #    return K
 
 
     def hpi(self, k):
@@ -277,3 +287,7 @@ class SphinxParams:
         "The Ultrix key to protect the root key."
         K = self.derive_key(k, b"UrooUrooUrooUroo")
         return K
+
+    def derive_user_keys(self, k, iv):
+        material = self.aes.enc(k, iv).update(b"\x00" * self.k * 2)
+        return (material[:self.k], material[self.k:])

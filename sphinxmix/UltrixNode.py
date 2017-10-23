@@ -46,28 +46,28 @@ def ultrix_process(params, secret, header, delta, assoc=b''):
 
     # Compute the shared secret
     s = group.expon(alpha, [ secret ])
-    aes_s = p.get_aes_key(s)
-    
+    aes_s, (hrho, hmu, tag) = p.get_aes_key_all(s)
     assert len(beta) == p.max_len - 32
     
     beta_pad = beta + (b"\x00" * (2 * p.max_len)) 
-    B = p.xor_rho(p.hrho(aes_s), beta_pad)
+    B = p.xor_rho(hrho, beta_pad)
 
     length = B[0]
     routing = B[1:1+length]
     rest = B[1+length:]
 
-    tag = p.htau(aes_s)
     b = p.hb(alpha, aes_s)
     alpha = group.expon(alpha, [ b ])
     beta = rest[:(p.max_len - 32)]
 
     xgamma = gamma
-    round_mac_key = p.hmu(aes_s)
-    gamma = p.mu(round_mac_key, b"G1" + xgamma + original_beta)
-    root_K = p.mu(round_mac_key, b"G2" + gamma)
-    body_K = p.mu(round_mac_key, b"G3" + gamma)
+    round_mac_key = hmu
+    gamma = p.mu(round_mac_key, xgamma + original_beta)
+    #root_K = p.mu(round_mac_key, b"G2" + gamma)
+    #body_K = p.mu(round_mac_key, b"G3" + gamma)
     
+    root_K, body_K = p.derive_user_keys(hmu, gamma)
+
     dest_key = p.small_perm(root_K, dest_key)
     delta = p.xor_rho(body_K, delta)
 

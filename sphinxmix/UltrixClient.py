@@ -39,6 +39,9 @@ from .SphinxClient import Nenc, Route_pack, PFdecode, rand_subset
 from .SphinxClient import pack_message, unpack_message
 
 
+ultrix_hdr_record = namedtuple("ultrix_hdr_record", ["alpha", "s", "b", "aes", "hrho", "hmu", "htau"])
+
+
 def create_header(params, nodelist, keys, assoc=None, secrets = None, gamma=None, dest_key = None):
     """ Internal function, creating a Ultrix header.""" 
 
@@ -74,12 +77,12 @@ def create_header(params, nodelist, keys, assoc=None, secrets = None, gamma=None
     for k in keys:
         alpha = group.expon_base(blind_factors)
         s = group.expon(k, blind_factors)
-        aes_s = p.get_aes_key(s)
+        aes_s, (hrho, hmu, htau) = p.get_aes_key_all(s)
 
         b = p.hb(alpha, aes_s)
         blind_factors += [ b ] 
 
-        hr = header_record(alpha, s, b, aes_s)
+        hr = ultrix_hdr_record(alpha, s, b, aes_s, hrho, hmu, htau)
         asbtuples.append(hr)
 
     # Compute the filler strings
@@ -88,7 +91,7 @@ def create_header(params, nodelist, keys, assoc=None, secrets = None, gamma=None
     for i in range(1,nu):
 
         plain = phi + (b"\x00" * (len(node_meta[i])))
-        phi = p.xor_rho(p.hrho(asbtuples[i-1].aes), (b"\x00"*min_len)+plain)
+        phi = p.xor_rho(asbtuples[i-1].hrho, (b"\x00"*min_len)+plain)
         phi = phi[min_len:]
 
         min_len -= len(node_meta[i])        
@@ -103,7 +106,7 @@ def create_header(params, nodelist, keys, assoc=None, secrets = None, gamma=None
         raise SphinxException("Insufficient space routing info: missing %s bytes" % (abs(random_pad_len))) 
 
     beta = node_meta[-1] + urandom(random_pad_len)
-    beta = p.xor_rho(p.hrho(asbtuples[nu-1].aes), beta) + phi
+    beta = p.xor_rho(asbtuples[nu-1].hrho, beta) + phi
 
     beta_all = [ beta ]
     for i in range(nu-2, -1, -1):
@@ -113,7 +116,7 @@ def create_header(params, nodelist, keys, assoc=None, secrets = None, gamma=None
         plain_beta_len = (max_len - 32) - len(node_id)
 
         plain = node_id + beta[:plain_beta_len]
-        beta = p.xor_rho(p.hrho(asbtuples[i].aes), plain)
+        beta = p.xor_rho(asbtuples[i].hrho, plain)
         beta_all = [ beta ] + beta_all
         assert len(beta) == (max_len - 32)
 
@@ -124,10 +127,12 @@ def create_header(params, nodelist, keys, assoc=None, secrets = None, gamma=None
     new_keys = []
     for beta_i, k in zip(beta_all, asbtuples):
         xgamma = gamma
-        round_mac_key = p.hmu(k.aes)
-        gamma = p.mu(round_mac_key, b"G1" + xgamma + beta_i)
-        root_K = p.mu(round_mac_key, b"G2" + gamma)
-        body_K = p.mu(round_mac_key, b"G3" + gamma)
+        round_mac_key = k.hmu
+        gamma = p.mu(round_mac_key, xgamma + beta_i)
+        # root_K = p.mu(round_mac_key, b"G2" + gamma)
+        # body_K = p.mu(round_mac_key, b"G3" + gamma)
+
+        root_K, body_K = p.derive_user_keys(k.hmu, gamma)
 
         root_keys += [ root_K ]
         new_keys += [ body_K ]
