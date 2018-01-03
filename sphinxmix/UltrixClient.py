@@ -73,9 +73,11 @@ def create_header(params, nodelist, keys, assoc=None, secrets = None, gamma=None
     for k in keys:
         alpha = group.expon_base(blind_factors)
         s = group.expon(k, blind_factors)
-        aes_s, (hrho, hmu, htau) = p.get_aes_key_all(s)
+        aes_s = p.get_aes_key(s)
+        (hrho, hmu, htau, b_factor) = p.derive_user_keys(k=aes_s, iv = b"_master_________", number = 4)
+        b = p.group.makeexp(b_factor)
 
-        b = p.hb(aes_s)
+        #b = p.hb(aes_s)
         blind_factors += [ b ] 
 
         hr = ultrix_hdr_record(alpha, s, b, aes_s, hrho, hmu, htau)
@@ -124,9 +126,9 @@ def create_header(params, nodelist, keys, assoc=None, secrets = None, gamma=None
     for beta_i, k in zip(beta_all, asbtuples):
         xgamma = gamma
         round_mac_key = k.hmu
-        gamma = p.mu(round_mac_key, xgamma + beta_i)
+        inner_mac = p.mu(round_mac_key, xgamma + beta_i)
 
-        root_K, body_K = p.derive_user_keys(k.hmu, gamma)
+        root_K, body_K, gamma = p.derive_user_keys(inner_mac, b"_fragile________", 3)
 
         root_keys += [ root_K ]
         new_keys += [ body_K ]

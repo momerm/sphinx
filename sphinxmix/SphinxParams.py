@@ -73,6 +73,7 @@ class SphinxParams:
 
     def __init__(self, group=None, header_len = 192, body_len = 1024, assoc_len=0, k=16, dest_len=16):
         self.aes = Cipher("AES-128-CTR")
+        self.cbc = Cipher("AES-128-CBC")
 
         self.assoc_len = assoc_len
         self.max_len = header_len
@@ -89,11 +90,26 @@ class SphinxParams:
 
 
     # The LIONESS PRP
-    def aes_ctr(self, k, m, iv = b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"):
-        k = bytes(k)
-        m = bytes(m)
-        assert type(k) is bytes and type(m) is bytes
+    def aes_ctr(self, k, m, iv = b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"):      
+        #k = bytes(k)
+        #m = bytes(m)  
         c = self.aes.enc(k, iv).update(m)
+        return bytes(c)
+
+    # The LIONESS PRP
+    def aes_cbc_enc(self, k, m, iv = b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"):        
+        cipher = self.cbc.enc(k, iv)
+        cipher.set_padding(False)
+        c = cipher.update(m)
+        c = c + cipher.finalize()
+        return bytes(c)
+
+    # The LIONESS PRP
+    def aes_cbc_dec(self, k, m, iv = b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"):        
+        cipher = self.cbc.dec(k, iv)
+        cipher.set_padding(False)
+        c = cipher.update(m)
+        c = c + cipher.finalize()
         return bytes(c)
 
     def lioness_enc(self, key, message):
@@ -196,7 +212,7 @@ class SphinxParams:
 
     def get_aes_key(self, s):
         group = self.group
-        return self.hash(b"aes_key:" + group.printable(s))[:self.k]
+        return bytes(self.hash(b"aes_key:" + group.printable(s))[:self.k])
 
     def get_aes_key_all(self, s):
         group = self.group
@@ -256,9 +272,12 @@ class SphinxParams:
         K = self.derive_key(k, b"UrooUrooUrooUroo")
         return K
 
-    def derive_user_keys(self, k, iv):
-        material = self.aes.enc(k, iv).update(b"\x00" * self.k * 2)
-        return (material[:self.k], material[self.k:])
+    def derive_user_keys(self, k, iv, number=2):
+        material = self.aes.enc(k, iv).update(b"\x00" * self.k * number)
+        st_ranges = range(0, self.k * number, self.k)
+
+
+        return [ material[st:st+self.k] for st in st_ranges ]
 
 # All tests
 
@@ -297,3 +316,11 @@ def test_params():
     c = params.aes_ctr(k, plain)
     p = params.aes_ctr(k, c)
     assert p == b"Bob"
+
+    plain = b"ACB" * 16
+    k = urandom(16)
+    iv = urandom(16)
+    ctxt = params.aes_cbc_enc(k, plain)
+    assert len(ctxt) == len(plain)
+    ptxt = params.aes_cbc_dec(k, ctxt)
+    assert ptxt == plain

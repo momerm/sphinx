@@ -21,6 +21,9 @@
 
 from . import SphinxException
 
+_master = b"_master_________"
+_fragile = b"_fragile________"
+
 # Core Process function -- devoid of any chrome
 def ultrix_process(params, secret, header, delta, assoc=b''):
     """ The heart of a Ultrix server, that processes incoming messages.
@@ -41,12 +44,16 @@ def ultrix_process(params, secret, header, delta, assoc=b''):
 
     # Compute the shared secret
     s = p.group.expon(alpha, [ secret ])
-    aes_s, (header_enc_key, round_mac_key, tag) = p.get_aes_key_all(s)
+    #aes_s, (header_enc_key, round_mac_key, tag) = p.get_aes_key_all(s)
+    aes_s = p.get_aes_key(s)
+    (header_enc_key, round_mac_key, tag, b_factor) = p.derive_user_keys(k=aes_s, iv = _master, number = 4)
+    b = p.group.makeexp(b_factor)
+
     assert len(beta) == p.max_len - 32
 
     # Compute the secrets based on the header too
-    gamma = p.mu(round_mac_key, gamma + beta)
-    root_K, body_K = p.derive_user_keys(round_mac_key, gamma)
+    inner_mac = p.mu(round_mac_key, gamma + beta)
+    root_K, body_K, gamma = p.derive_user_keys(k=inner_mac, iv = _fragile, number = 3)
 
     # Decrypt the header
     beta_pad = beta + p.zero_pad
@@ -57,7 +64,7 @@ def ultrix_process(params, secret, header, delta, assoc=b''):
     rest = B[1+length:]
 
     # Recode the alpha and beta
-    b = p.hb(aes_s)
+    #b = p.hb(aes_s)
     alpha = p.group.expon(alpha, [ b ])
     beta = rest[:(p.max_len - 32)]
 

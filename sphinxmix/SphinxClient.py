@@ -136,6 +136,7 @@ def create_header(params, nodelist, keys, dest, assoc=None):
         alpha = group.expon_base(blind_factors)
         s = group.expon(k, blind_factors)
         aes_s = p.get_aes_key(s)
+        assert type(aes_s) == bytes
 
         b = p.hb(aes_s)
         # blind_factor = blind_factor.mod_mul(b, p.group.G.order())
@@ -148,9 +149,12 @@ def create_header(params, nodelist, keys, dest, assoc=None):
     phi = b''
     min_len = (max_len - 32)
     for i in range(1,nu):
-
         plain = phi + (b"\x00" * (p.k + len(node_meta[i])))
-        phi = p.xor_rho(p.hrho(asbtuples[i-1].aes), (b"\x00"*min_len)+plain)
+
+        kx = p.hrho(asbtuples[i-1].aes)
+        mx = (b"\x00"*min_len)+plain
+
+        phi = p.xor_rho(kx, mx)
         phi = phi[min_len:]
 
         min_len -= len(node_meta[i]) + p.k
