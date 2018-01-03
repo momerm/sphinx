@@ -160,6 +160,8 @@ def create_forward_message(params, nodelist, keys, dest, msg, assoc=None):
     dest_inner_key = params.derive_key(dest_key, b"dest_inner______")
     body_inner_key = params.derive_key(dest_key, b"body_inner______")
 
+    # TODO: Encure that changing the body destroys the dest_key.
+
     enc_dest = p.xor_rho(dest_inner_key, dest)
     assert len(enc_dest) == len(dest)
 
@@ -172,10 +174,10 @@ def create_forward_message(params, nodelist, keys, dest, msg, assoc=None):
 
     # Compute the delta values
     delta = p.pi(body_inner_key, body)
-    delta = p.xor_rho(secrets[nu-1], delta)
+    delta = p.aes_cbc_dec(secrets[nu-1], delta)
     for i in range(nu-2, -1, -1):
-        delta = p.xor_rho(secrets[i], delta)
-
+        delta = p.aes_cbc_dec(secrets[i], delta)
+        
     return header, delta
 
 def create_surb(params, nodelist, keys, dest, assoc=None):
@@ -229,6 +231,8 @@ def receive_forward(params, header, mac_key, routing, delta):
     dest_inner_key = params.derive_key(dest_key, b"dest_inner______")
     body_inner_key = params.derive_key(dest_key, b"body_inner______")
 
+    # TODO: Encure that changing the body destroys the dest_key.
+
     dest = params.xor_rho(dest_inner_key, dest)
     delta = params.pii(body_inner_key, delta)
 
@@ -249,7 +253,7 @@ def receive_surb(params, keytuple, delta):
     ktilde = keytuple.pop(0)
     nu = len(keytuple)
     for i in range(nu-1, -1, -1):
-        delta = p.xor_rho(keytuple[i], delta)
+        delta = p.aes_cbc_dec(keytuple[i], delta)
     delta = p.xor_rho(ktilde, delta)
 
     if delta[:p.k] == p.mu(ktilde, delta[p.k:]):

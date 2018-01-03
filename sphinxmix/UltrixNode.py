@@ -70,7 +70,8 @@ def ultrix_process(params, secret, header, delta, assoc=b''):
 
     # Decode the delta
     dest_key = p.small_perm(root_K, dest_key)
-    delta = p.xor_rho(body_K, delta)
+    #delta = p.xor_rho(body_K, delta)
+    delta = p.aes_cbc_enc(body_K, delta)
 
     # Package packet and keys
     ret = (tag, routing, ((alpha, beta, gamma, dest_key), delta), body_K)
