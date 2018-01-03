@@ -215,7 +215,7 @@ class SphinxParams:
         K = self.aes.enc(k, iv).update(m)
         return K
 
-    def hb(self, alpha, k):
+    def hb(self, k):
         "Compute a hash of alpha and s to use as a blinding factor"
         K = self.derive_key(k, b"hbhbhbhbhbhbhbhb")
         return self.group.makeexp(K)

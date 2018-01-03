@@ -53,7 +53,7 @@ def ultrix_process(params, secret, header, delta, assoc=b''):
     routing = B[1:1+length]
     rest = B[1+length:]
 
-    b = p.hb(alpha, aes_s)
+    b = p.hb(aes_s)
     alpha = group.expon(alpha, [ b ])
     beta = rest[:(p.max_len - 32)]
 

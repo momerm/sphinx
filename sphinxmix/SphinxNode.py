@@ -59,7 +59,7 @@ def sphinx_process(params, secret, header, delta, assoc=b''):
     rest = B[1+length:]
 
     tag = p.htau(aes_s)
-    b = p.hb(alpha, aes_s)
+    b = p.hb(aes_s)
     alpha = group.expon(alpha, [ b ])
     gamma = rest[:p.k]
     beta = rest[p.k:p.k+(p.max_len - 32)]

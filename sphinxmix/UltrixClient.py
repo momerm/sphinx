@@ -75,7 +75,7 @@ def create_header(params, nodelist, keys, assoc=None, secrets = None, gamma=None
         s = group.expon(k, blind_factors)
         aes_s, (hrho, hmu, htau) = p.get_aes_key_all(s)
 
-        b = p.hb(alpha, aes_s)
+        b = p.hb(aes_s)
         blind_factors += [ b ] 
 
         hr = ultrix_hdr_record(alpha, s, b, aes_s, hrho, hmu, htau)

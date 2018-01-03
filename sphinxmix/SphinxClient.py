@@ -137,7 +137,7 @@ def create_header(params, nodelist, keys, dest, assoc=None):
         s = group.expon(k, blind_factors)
         aes_s = p.get_aes_key(s)
 
-        b = p.hb(alpha, aes_s)
+        b = p.hb(aes_s)
         # blind_factor = blind_factor.mod_mul(b, p.group.G.order())
         blind_factors += [ b ] 
 
