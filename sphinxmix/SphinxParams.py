@@ -190,7 +190,7 @@ class SphinxParams:
 
     def small_perm(self, key, data):
         assert len(data) == self.k
-        aes = Cipher("AES-128-ECB")
+        aes = Cipher("AES-128-CBC")
         enc = aes.enc(key, None)
         enc.set_padding(False)
         c = enc.update(data)
@@ -199,7 +199,7 @@ class SphinxParams:
 
     def small_perm_inv(self, key, data):
         assert len(data) == self.k
-        aes = Cipher("AES-128-ECB")
+        aes = Cipher("AES-128-CBC")
         enc = aes.dec(key, None)
         enc.set_padding(False)
         c = enc.update(data)
