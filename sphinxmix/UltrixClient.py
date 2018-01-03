@@ -125,8 +125,6 @@ def create_header(params, nodelist, keys, assoc=None, secrets = None, gamma=None
         xgamma = gamma
         round_mac_key = k.hmu
         gamma = p.mu(round_mac_key, xgamma + beta_i)
-        # root_K = p.mu(round_mac_key, b"G2" + gamma)
-        # body_K = p.mu(round_mac_key, b"G3" + gamma)
 
         root_K, body_K = p.derive_user_keys(k.hmu, gamma)
 

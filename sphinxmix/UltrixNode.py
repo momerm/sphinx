@@ -30,22 +30,25 @@ def ultrix_process(params, secret, header, delta, assoc=b''):
         
     """
     p = params
-    group = p.group
     alpha, beta, gamma, dest_key = header
-    original_beta = beta
-
+    
     if params.assoc_len != len(assoc):
         raise SphinxException("Associated data length mismatch: expected %s and got %s." % (params.assoc_len, len(assoc)))
 
     # Check that alpha is in the group
-    if not group.in_group(alpha):
+    if not p.group.in_group(alpha):
         raise SphinxException("Alpha not in Group.")
 
     # Compute the shared secret
-    s = group.expon(alpha, [ secret ])
+    s = p.group.expon(alpha, [ secret ])
     aes_s, (header_enc_key, round_mac_key, tag) = p.get_aes_key_all(s)
     assert len(beta) == p.max_len - 32
-    
+
+    # Compute the secrets based on the header too
+    gamma = p.mu(round_mac_key, gamma + beta)
+    root_K, body_K = p.derive_user_keys(round_mac_key, gamma)
+
+    # Decrypt the header
     beta_pad = beta + p.zero_pad
     B = p.xor_rho(header_enc_key, beta_pad)
 
@@ -53,16 +56,16 @@ def ultrix_process(params, secret, header, delta, assoc=b''):
     routing = B[1:1+length]
     rest = B[1+length:]
 
+    # Recode the alpha and beta
     b = p.hb(aes_s)
-    alpha = group.expon(alpha, [ b ])
+    alpha = p.group.expon(alpha, [ b ])
     beta = rest[:(p.max_len - 32)]
 
-    gamma = p.mu(round_mac_key, gamma + original_beta)
-    root_K, body_K = p.derive_user_keys(round_mac_key, gamma)
-
+    # Decode the delta
     dest_key = p.small_perm(root_K, dest_key)
     delta = p.xor_rho(body_K, delta)
 
+    # Package packet and keys
     ret = (tag, routing, ((alpha, beta, gamma, dest_key), delta), body_K)
     return ret
 
