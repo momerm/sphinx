@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # Copyright 2011 Ian Goldberg
-# Copyright 2016 George Danezis (UCL InfoSec Group)
+# Copyright 2017 George Danezis (UCL InfoSec Group)
 #
 # This file is part of Sphinx.
 # 
@@ -18,9 +18,6 @@
 # License along with Sphinx.  If not, see
 # <http://www.gnu.org/licenses/>.
 
-
-# Python 2/3 compatibility
-from builtins import bytes
 
 from . import SphinxException
 
@@ -46,11 +43,11 @@ def ultrix_process(params, secret, header, delta, assoc=b''):
 
     # Compute the shared secret
     s = group.expon(alpha, [ secret ])
-    aes_s, (hrho, hmu, tag) = p.get_aes_key_all(s)
+    aes_s, (header_enc_key, round_mac_key, tag) = p.get_aes_key_all(s)
     assert len(beta) == p.max_len - 32
     
-    beta_pad = beta + (b"\x00" * (2 * p.max_len)) 
-    B = p.xor_rho(hrho, beta_pad)
+    beta_pad = beta + p.zero_pad
+    B = p.xor_rho(header_enc_key, beta_pad)
 
     length = B[0]
     routing = B[1:1+length]
@@ -60,13 +57,8 @@ def ultrix_process(params, secret, header, delta, assoc=b''):
     alpha = group.expon(alpha, [ b ])
     beta = rest[:(p.max_len - 32)]
 
-    xgamma = gamma
-    round_mac_key = hmu
-    gamma = p.mu(round_mac_key, xgamma + original_beta)
-    #root_K = p.mu(round_mac_key, b"G2" + gamma)
-    #body_K = p.mu(round_mac_key, b"G3" + gamma)
-    
-    root_K, body_K = p.derive_user_keys(hmu, gamma)
+    gamma = p.mu(round_mac_key, gamma + original_beta)
+    root_K, body_K = p.derive_user_keys(round_mac_key, gamma)
 
     dest_key = p.small_perm(root_K, dest_key)
     delta = p.xor_rho(body_K, delta)

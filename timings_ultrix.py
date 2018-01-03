@@ -1,4 +1,4 @@
-# Run as: python -OO -m cProfile -s tottime timings.py > prof.txt 
+# Run as: python -OO -m cProfile -s tottime timings_ultrix.py > prof.txt 
 
 if __name__ == "__main__":
     from sphinxmix.UltrixClient import profile_ultrix_c25519

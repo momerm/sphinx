@@ -27,7 +27,7 @@ from os import urandom
 from hashlib import sha256
 import hmac
 
-from petlib.ec import EcGroup, EcPt, POINT_CONVERSION_UNCOMPRESSED
+from petlib.ec import EcGroup, POINT_CONVERSION_UNCOMPRESSED
 from petlib.bn import Bn
 from petlib.cipher import Cipher
 
@@ -68,41 +68,6 @@ class Group_ECC:
     def printable(self, alpha):
         return alpha.export(POINT_CONVERSION_UNCOMPRESSED)
 
-def test_group():
-    G = Group_ECC()
-    sec1 = G.gensecret();
-    sec2 = G.gensecret();
-    gen = G.g
-
-    assert G.expon(G.expon(gen, [ sec1 ]), [ sec2 ]) == G.expon(G.expon(gen, [ sec2 ]), [ sec1 ])
-    assert G.in_group(G.expon(gen, [ sec1 ]))
-
-def test_params():
-    # Test Init
-    params = SphinxParams()
-    
-    # Test Lioness
-    k = b"A" * 16
-    m = b"ARG"* 16
-
-    c = params.lioness_enc(k,m)
-    m2 = params.lioness_dec(k, c)
-    assert m == m2
-
-    # Test CTR
-    k = urandom(16)
-    c = params.aes_ctr(k, b"Hello World!")
-    assert params.aes_ctr(k, c) == b"Hello World!"
-
-    c = params.small_perm(b"\x00"*16, b"\x00"*16)
-    c2 = params.small_perm_inv(b"\x00"*16, c)
-    assert c2 == b"\x00"*16
-
-    plain = b"Bob"
-    k = urandom(16)
-    c = params.aes_ctr(k, plain)
-    p = params.aes_ctr(k, c)
-    assert p == b"Bob"
 
 class SphinxParams:
 
@@ -111,6 +76,9 @@ class SphinxParams:
 
         self.assoc_len = assoc_len
         self.max_len = header_len
+
+        self.zero_pad = b"\x00" * (2 * self.max_len)
+
         self.m = body_len
         self.k = k
         self.dest_len = dest_len
@@ -291,3 +259,41 @@ class SphinxParams:
     def derive_user_keys(self, k, iv):
         material = self.aes.enc(k, iv).update(b"\x00" * self.k * 2)
         return (material[:self.k], material[self.k:])
+
+# All tests
+
+def test_group():
+    G = Group_ECC()
+    sec1 = G.gensecret()
+    sec2 = G.gensecret()
+    gen = G.g
+
+    assert G.expon(G.expon(gen, [ sec1 ]), [ sec2 ]) == G.expon(G.expon(gen, [ sec2 ]), [ sec1 ])
+    assert G.in_group(G.expon(gen, [ sec1 ]))
+
+def test_params():
+    # Test Init
+    params = SphinxParams()
+    
+    # Test Lioness
+    k = b"A" * 16
+    m = b"ARG"* 16
+
+    c = params.lioness_enc(k,m)
+    m2 = params.lioness_dec(k, c)
+    assert m == m2
+
+    # Test CTR
+    k = urandom(16)
+    c = params.aes_ctr(k, b"Hello World!")
+    assert params.aes_ctr(k, c) == b"Hello World!"
+
+    c = params.small_perm(b"\x00"*16, b"\x00"*16)
+    c2 = params.small_perm_inv(b"\x00"*16, c)
+    assert c2 == b"\x00"*16
+
+    plain = b"Bob"
+    k = urandom(16)
+    c = params.aes_ctr(k, plain)
+    p = params.aes_ctr(k, c)
+    assert p == b"Bob"

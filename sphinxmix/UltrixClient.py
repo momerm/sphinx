@@ -24,16 +24,12 @@ from collections import namedtuple
 from struct import pack
 
 from petlib.pack import encode, decode
-from binascii import hexlify
 
-# Python 2/3 compatibility
-from builtins import bytes
 
 from .SphinxParams import SphinxParams
 from . import SphinxException
 
-
-from .SphinxClient import Relay_flag, Dest_flag, Surb_flag, header_record, pki_entry
+from .SphinxClient import Relay_flag, Dest_flag, Surb_flag, pki_entry
 from .SphinxClient import pad_body, unpad_body
 from .SphinxClient import Nenc, Route_pack, PFdecode, rand_subset
 from .SphinxClient import pack_message, unpack_message
@@ -271,7 +267,7 @@ def decode_surb(params, header, enc_dest):
 
 # TESTS
 
-from nacl.bindings import crypto_scalarmult_base, crypto_scalarmult
+from nacl.bindings import crypto_scalarmult_base
 
 def profile_ultrix_c25519(rep=100, payload_size=1024 * 10):
     r = 5
@@ -295,7 +291,6 @@ def profile_ultrix_c25519(rep=100, payload_size=1024 * 10):
     use_nodes = rand_subset(pkiPub.keys(), r)
     nodes_routing = list(map(Nenc, use_nodes))
     node_keys = [pkiPub[n].y for n in use_nodes]
-    print()
 
     assoc = [b"XXXX"] * len(nodes_routing)
     header, delta = create_forward_message(params, nodes_routing, node_keys, b"dest", b"this is a test", assoc)
@@ -345,7 +340,7 @@ def test_ultrix_c25519(rep=100, payload_size=1024 * 10):
     T_package = (t1-t0)/rep
 
     from .UltrixNode import ultrix_process
-    import time
+
     t0 = time.time()
     for _ in range(rep):
         x = pkiPriv[use_nodes[0]].x
@@ -357,7 +352,6 @@ def test_ultrix_c25519(rep=100, payload_size=1024 * 10):
     return T_package, T_process
 
 def test_minimal_ultrix():
-    from .SphinxParams import SphinxParams
     r = 5
     params = SphinxParams(header_len = 32+4*8+32)
 
