@@ -72,8 +72,9 @@ def create_header(params, nodelist, keys, assoc=None, secrets = None, gamma=None
 
     asbtuples = []
     
+    alpha0 = group.expon_base(blind_factors[-1:])
     for k in keys:
-        alpha = group.expon_base(blind_factors)
+        alpha = alpha0
         s = group.expon(k, blind_factors)
         aes_s = p.get_aes_key(s)
         (hrho, hmu, htau, b_factor) = p.derive_user_keys(k=aes_s, iv = b"_master_________", number = 4)
@@ -84,6 +85,8 @@ def create_header(params, nodelist, keys, assoc=None, secrets = None, gamma=None
 
         hr = ultrix_hdr_record(alpha, s, b, aes_s, hrho, hmu, htau)
         asbtuples.append(hr)
+
+        alpha0 = group.expon(alpha0, [b])
 
     # Compute the filler strings
     phi = b''
@@ -349,6 +352,7 @@ def test_ultrix_c25519(rep=100, payload_size=1024 * 10):
     node_keys = [pkiPub[n].y for n in use_nodes]
     assoc = [b"XXXX"] * len(nodes_routing)
     
+    print()
     import time
     t0 = time.time()
     for _ in range(rep):
