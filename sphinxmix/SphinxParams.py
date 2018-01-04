@@ -103,7 +103,7 @@ class SphinxParams:
         cipher = self.cbc.enc(k, iv)
         cipher.set_padding(False)
         c = cipher.update(m)
-        c = c + cipher.finalize()
+        #c = c + cipher.finalize()
         return bytes(c)
 
     # The LIONESS PRP
@@ -111,7 +111,7 @@ class SphinxParams:
         cipher = self.cbc.dec(k, iv)
         cipher.set_padding(False)
         c = cipher.update(m)
-        c = c + cipher.finalize()
+        #c = c + cipher.finalize()
         return bytes(c)
 
     def lioness_enc(self, key, message):
@@ -196,7 +196,7 @@ class SphinxParams:
         enc = self.cbc.enc(key, None)
         enc.set_padding(False)
         c = enc.update(data)
-        c += enc.finalize()
+        #c += enc.finalize()
         return c
 
     def small_perm_inv(self, key, data):
@@ -205,7 +205,7 @@ class SphinxParams:
         dec = self.cbc.dec(key, None)
         dec.set_padding(False)
         c = dec.update(data)
-        c += dec.finalize()
+        #c += dec.finalize()
         return c
 
     # The various hashes

@@ -275,10 +275,13 @@ def decode_surb(params, header, enc_dest):
 
 from nacl.bindings import crypto_scalarmult_base
 
+
 def profile_ultrix_c25519(rep=100, payload_size=1024 * 10):
     r = 5
+
     from .SphinxParamsC25519 import Group_C25519
-    
+    from .UltrixNode import ultrix_process
+
     group = Group_C25519()
     params = SphinxParams(group=group, header_len = 32+50, body_len=payload_size, assoc_len=4)
 
@@ -299,17 +302,28 @@ def profile_ultrix_c25519(rep=100, payload_size=1024 * 10):
     node_keys = [pkiPub[n].y for n in use_nodes]
 
     assoc = [b"XXXX"] * len(nodes_routing)
-    header, delta = create_forward_message(params, nodes_routing, node_keys, b"dest", b"this is a test", assoc)
-    
-    from .UltrixNode import ultrix_process
+
     import time
+    ta = time.time()
+
+    
+    t0 = time.time()
+    for _ in range(rep):
+        header, delta = create_forward_message(params, nodes_routing, node_keys, b"dest", b"this is a test", assoc)
+    t1 = time.time()
+    print("Time per mix encoding: %.2fms" % ((t1-t0)*1000.0/rep))
+    
+
     t0 = time.time()
     for _ in range(rep):
         x = pkiPriv[use_nodes[0]].x
         ultrix_process(params, x, header, delta, b"XXXX")
     t1 = time.time()
     print("Time per mix processing: %.2fms" % ((t1-t0)*1000.0/rep))
-    T_process = (t1-t0)/rep
+
+    tb = time.time()
+
+    print("Total (for %d repeats): %.2fms" % (rep, (tb-ta)*1000.0))
 
 def test_ultrix_c25519(rep=100, payload_size=1024 * 10):
     r = 5
