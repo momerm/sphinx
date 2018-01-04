@@ -51,6 +51,8 @@ def create_header(params, nodelist, keys, assoc=None, secrets = None, gamma=None
 
     if not params.assoc_len > 0:
         assoc = [b''] * len(nodelist)
+    else:
+        assert assoc != None
 
     assert len(assoc) == len(nodelist)
     for assoc_data in assoc:
@@ -123,10 +125,10 @@ def create_header(params, nodelist, keys, assoc=None, secrets = None, gamma=None
     original_gamma = gamma
     root_keys = []
     new_keys = []
-    for beta_i, k in zip(beta_all, asbtuples):
+    for beta_i, k, assoc_data in zip(beta_all, asbtuples, assoc):
         xgamma = gamma
         round_mac_key = k.hmu
-        inner_mac = p.mu(round_mac_key, xgamma + beta_i)
+        inner_mac = p.mu(round_mac_key, assoc_data + xgamma + beta_i)
 
         root_K, body_K, gamma = p.derive_user_keys(inner_mac, b"_fragile________", 3)
 
@@ -331,8 +333,6 @@ def test_ultrix_c25519(rep=100, payload_size=1024 * 10):
     use_nodes = rand_subset(pkiPub.keys(), r)
     nodes_routing = list(map(Nenc, use_nodes))
     node_keys = [pkiPub[n].y for n in use_nodes]
-    print()
-
     assoc = [b"XXXX"] * len(nodes_routing)
     
     import time
@@ -357,7 +357,7 @@ def test_ultrix_c25519(rep=100, payload_size=1024 * 10):
 
 def test_minimal_ultrix():
     r = 5
-    params = SphinxParams(header_len = 32+4*8+32)
+    params = SphinxParams(header_len = 32+4*8+32, assoc_len=4)
 
     # The minimal PKI involves names of nodes and keys
     
@@ -377,8 +377,14 @@ def test_minimal_ultrix():
     node_keys = [pkiPub[n].y for n in use_nodes]
     dest = b"bob"
     message = b"this is a test"
-    header, delta = create_forward_message(params, nodes_routing, node_keys, dest, message)
+    X = [b'A', b'B', b'C', b'D', b'E'] * 2
+    assoc = [b"XXX" + X[i] for i in range( len(nodes_routing) )]
 
+    assoc_copy = assoc[:]
+
+
+    header, delta = create_forward_message(params, nodes_routing, node_keys, dest, message, assoc=assoc)
+    
     # Test encoding and decoding
 
     bin_message = pack_message(params, (header, delta))
@@ -395,8 +401,9 @@ def test_minimal_ultrix():
 
     i = 0
     while True:
+        assoc_data = assoc_copy.pop(0)
 
-        ret = ultrix_process(params, x, header, delta)
+        ret = ultrix_process(params, x, header, delta, assoc=assoc_data)
         (tag, B, (header, delta), mac_key) = ret
         routing = PFdecode(params, B)
 
@@ -421,15 +428,18 @@ def test_minimal_ultrix():
             break
 
     # Test the nym creation
-    surbid, surbkeytuple, nymtuple = create_surb(params, nodes_routing, node_keys, b"myself")
+    surbid, surbkeytuple, nymtuple = create_surb(params, nodes_routing, node_keys, b"myself", assoc=assoc)
     
     message = b"This is a reply"
     header, delta = package_surb(params, nymtuple, message)
 
     x = pkiPriv[use_nodes[0]].x
+    assoc_copy = assoc[:]
 
     while True:
-        ret = ultrix_process(params, x, header, delta)
+        assoc_data = assoc_copy.pop(0)
+
+        ret = ultrix_process(params, x, header, delta, assoc=assoc_data)
         (tag, B, (header, delta), mac_key) = ret
         routing = PFdecode(params, B)
 

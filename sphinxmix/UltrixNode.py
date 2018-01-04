@@ -44,7 +44,6 @@ def ultrix_process(params, secret, header, delta, assoc=b''):
 
     # Compute the shared secret
     s = p.group.expon(alpha, [ secret ])
-    #aes_s, (header_enc_key, round_mac_key, tag) = p.get_aes_key_all(s)
     aes_s = p.get_aes_key(s)
     (header_enc_key, round_mac_key, tag, b_factor) = p.derive_user_keys(k=aes_s, iv = _master, number = 4)
     b = p.group.makeexp(b_factor)
@@ -52,7 +51,7 @@ def ultrix_process(params, secret, header, delta, assoc=b''):
     assert len(beta) == p.max_len - 32
 
     # Compute the secrets based on the header too
-    inner_mac = p.mu(round_mac_key, gamma + beta)
+    inner_mac = p.mu(round_mac_key, assoc + gamma + beta)
     root_K, body_K, gamma = p.derive_user_keys(k=inner_mac, iv = _fragile, number = 3)
 
     # Decrypt the header
@@ -64,13 +63,11 @@ def ultrix_process(params, secret, header, delta, assoc=b''):
     rest = B[1+length:]
 
     # Recode the alpha and beta
-    #b = p.hb(aes_s)
     alpha = p.group.expon(alpha, [ b ])
     beta = rest[:(p.max_len - 32)]
 
     # Decode the delta
     dest_key = p.small_perm(root_K, dest_key)
-    #delta = p.xor_rho(body_K, delta)
     delta = p.aes_cbc_enc(body_K, delta)
 
     # Package packet and keys

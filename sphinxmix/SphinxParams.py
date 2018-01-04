@@ -34,6 +34,8 @@ from petlib.cipher import Cipher
 # Python 2/3 compatibility
 from builtins import bytes
 
+zero_iv = b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+
 class Group_ECC:
     "Group operations in ECC"
 
@@ -90,14 +92,14 @@ class SphinxParams:
 
 
     # The LIONESS PRP
-    def aes_ctr(self, k, m, iv = b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"):      
+    def aes_ctr(self, k, m, iv = zero_iv):      
         #k = bytes(k)
         #m = bytes(m)  
         c = self.aes.enc(k, iv).update(m)
         return bytes(c)
 
     # The LIONESS PRP
-    def aes_cbc_enc(self, k, m, iv = b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"):        
+    def aes_cbc_enc(self, k, m, iv = zero_iv):        
         cipher = self.cbc.enc(k, iv)
         cipher.set_padding(False)
         c = cipher.update(m)
@@ -105,7 +107,7 @@ class SphinxParams:
         return bytes(c)
 
     # The LIONESS PRP
-    def aes_cbc_dec(self, k, m, iv = b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"):        
+    def aes_cbc_dec(self, k, m, iv = zero_iv):        
         cipher = self.cbc.dec(k, iv)
         cipher.set_padding(False)
         c = cipher.update(m)
@@ -190,8 +192,8 @@ class SphinxParams:
 
     def small_perm(self, key, data):
         assert len(data) == self.k
-        aes = Cipher("AES-128-CBC")
-        enc = aes.enc(key, None)
+        # aes = Cipher("AES-128-CBC")
+        enc = self.cbc.enc(key, None)
         enc.set_padding(False)
         c = enc.update(data)
         c += enc.finalize()
@@ -199,11 +201,11 @@ class SphinxParams:
 
     def small_perm_inv(self, key, data):
         assert len(data) == self.k
-        aes = Cipher("AES-128-CBC")
-        enc = aes.dec(key, None)
-        enc.set_padding(False)
-        c = enc.update(data)
-        c += enc.finalize()
+        # aes = Cipher("AES-128-CBC")
+        dec = self.cbc.dec(key, None)
+        dec.set_padding(False)
+        c = dec.update(data)
+        c += dec.finalize()
         return c
 
     # The various hashes
