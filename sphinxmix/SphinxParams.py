@@ -39,7 +39,7 @@ zero_iv = b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
 class Group_ECC:
     "Group operations in ECC"
 
-    def __init__(self, gid=713):
+    def __init__(self, gid=415):
         self.G = EcGroup(gid)
         self.g = self.G.generator()
 

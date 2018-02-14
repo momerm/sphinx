@@ -46,6 +46,9 @@ coverage.xml
 *.cover
 .hypothesis/
 
+# Generated conformance test
+"ctest/test case.json"
+
 # Translations
 *.mo
 *.pot

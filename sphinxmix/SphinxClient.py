@@ -23,7 +23,7 @@ from os import urandom
 from collections import namedtuple
 from struct import pack
 
-from petlib.pack import encode, decode
+from .pack import encode, decode
 
 # Python 2/3 compatibility
 from builtins import bytes
@@ -35,13 +35,13 @@ from . import SphinxException
 # FLAGS
 
 #: Routing flag indicating message is to be relayed.
-Relay_flag = "\xF0"
+Relay_flag = 0xF0
 
 #: Routing flag indicating message is to be delivered.
-Dest_flag = "\xF1"
+Dest_flag = 0xF1
 
 #: Routing flag indicating surb reply is to be delivered.
-Surb_flag = "\xF2"
+Surb_flag = 0xF2
 
 # Padding/unpadding of message bodies: a 0 bit, followed by as many 1
 # bits as it takes to fill it up
