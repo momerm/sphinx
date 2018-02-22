@@ -14,15 +14,11 @@ http://www.cypherpunks.ca/~iang/pubs/Sphinx_Oakland09.pdf
 
 Beyond the original proposal it allows for clients to communicate additional information to mix servers to implement arbitrary mixing strategies.
 
-More information
+About this fork
 ----------------
+This fork makes some minor changes to the [orignal python implementation](https://github.com/UCL-InfoSec/sphinx) to make it compatible with the JavaScript [implementation](https://github.com/momerm/sphinx-js).
 
-The sphinxmix python package may be installed from pypi using pip: https://pypi.python.org/pypi/sphinxmix/
-
-The documentation for sphinxmix may be found on Read the Docs: http://sphinxmix.readthedocs.io/en/latest/
-
-The Git repository for sphinxmix may be found at the UCL Information Security repository at: https://github.com/UCL-InfoSec/sphinx
-
+The default curve used is now NISTP256. Points are encoded in uncompressed format. Also routing flags are now byte sized integers rather than byte arrays.
 
 Licence
 -------
